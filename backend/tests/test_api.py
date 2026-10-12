@@ -161,7 +161,8 @@ def test_purchase_records_stock_and_initial_payment(client):
     assert Decimal(str(purchase["amount_paid"])) == Decimal("300")
 
     payments = client.get(
-        f"/api/transactions/{purchase['id']}/payments"
+        f"/api/transactions/{purchase['id']}/payments",
+        headers=login_headers(client, "operator"),
     )
     assert payments.status_code == 200, payments.text
 
@@ -229,7 +230,7 @@ def test_payment_cannot_exceed_transaction_total(client):
 
     response = client.post(
         f"/api/transactions/{purchase.json()['id']}/payments",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json={
             "amount": 1001,
             "method": "cash",
