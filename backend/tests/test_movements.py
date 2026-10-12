@@ -79,7 +79,7 @@ def test_sales_return_adds_stock_and_links_original_sale(client):
 
     response = client.post(
         "/api/movements/sales-returns",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "original_sale_id": sale["id"],
             "quantity_grams": 1,
@@ -103,7 +103,7 @@ def test_sales_return_cannot_exceed_original_sale_quantity(client):
 
     first = client.post(
         "/api/movements/sales-returns",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "original_sale_id": sale["id"],
             "quantity_grams": 3,
@@ -114,7 +114,7 @@ def test_sales_return_cannot_exceed_original_sale_quantity(client):
 
     second = client.post(
         "/api/movements/sales-returns",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "original_sale_id": sale["id"],
             "quantity_grams": 2,
@@ -128,7 +128,7 @@ def test_sales_return_cannot_exceed_original_sale_quantity(client):
 def test_return_requires_a_real_sale(client):
     response = client.post(
         "/api/movements/sales-returns",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "original_sale_id": 99999,
             "quantity_grams": 1,
@@ -144,7 +144,7 @@ def test_stock_increase_adjustment_updates_inventory(client):
 
     response = client.post(
         "/api/movements/adjustments",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "product_id": product["id"],
             "direction": "increase",
@@ -166,7 +166,7 @@ def test_stock_decrease_adjustment_updates_inventory(client):
 
     response = client.post(
         "/api/movements/adjustments",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "product_id": product["id"],
             "direction": "decrease",
@@ -187,7 +187,7 @@ def test_stock_decrease_cannot_exceed_available_stock(client):
 
     response = client.post(
         "/api/movements/adjustments",
-        headers=API_HEADERS,
+        headers=login_headers(client, "manager"),
         json={
             "product_id": product["id"],
             "direction": "decrease",
