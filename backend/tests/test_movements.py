@@ -62,7 +62,7 @@ def inventory_balance(client, product_id, location="Main Store"):
     response = client.get(
         "/api/inventory",
         params={"location": location},
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
     assert response.status_code == 200, response.text
     return sum(
