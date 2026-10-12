@@ -1,0 +1,22 @@
+
+services:
+  db:
+    image: postgres:17
+    container_name: hisabpro-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hisabpro
+      POSTGRES_USER: hisabpro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - hisabpro_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hisabpro -d hisabpro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hisabpro_data:

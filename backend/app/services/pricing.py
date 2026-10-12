@@ -1,0 +1,36 @@
+
+from decimal import Decimal, ROUND_HALF_UP
+
+
+MONEY_PLACES = Decimal("0.01")
+
+
+def money(value: Decimal) -> Decimal:
+    """Round a monetary amount to two decimal places."""
+    return value.quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+
+
+def calculate_total(
+    net_weight_grams: Decimal,
+    rate_per_gram: Decimal,
+    charges: Decimal = Decimal("0"),
+    purity: Decimal = Decimal("100"),
+) -> Decimal:
+    """
+    Calculate metal value plus charges.
+
+    Purity is expressed as a percentage:
+    100 = pure metal, 91.6 = 22K-like purity.
+    The rate is assumed to be the rate for 100% pure metal.
+    """
+    if net_weight_grams <= 0:
+        raise ValueError("Net weight must be greater than zero")
+    if rate_per_gram <= 0:
+        raise ValueError("Rate per gram must be greater than zero")
+    if charges < 0:
+        raise ValueError("Charges cannot be negative")
+    if not Decimal("0") <= purity <= Decimal("100"):
+        raise ValueError("Purity must be between 0 and 100")
+
+    metal_value = net_weight_grams * rate_per_gram * purity / Decimal("100")
+    return money(metal_value + charges)
