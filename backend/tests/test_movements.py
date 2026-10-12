@@ -41,7 +41,7 @@ def transaction_payload(product_id, weight, rate=100):
 def create_purchase(client, product_id, weight=10):
     response = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product_id, weight),
     )
     assert response.status_code == 201, response.text
@@ -51,7 +51,7 @@ def create_purchase(client, product_id, weight=10):
 def create_sale(client, product_id, weight=4):
     response = client.post(
         "/api/sales",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product_id, weight),
     )
     assert response.status_code == 201, response.text

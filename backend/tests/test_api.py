@@ -144,7 +144,7 @@ def test_purchase_records_stock_and_initial_payment(client):
 
     response = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(
             product["id"],
             weight=10,
@@ -176,14 +176,14 @@ def test_sale_reduces_stock_and_rejects_excess_sale(client):
 
     purchase = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product["id"], weight=10),
     )
     assert purchase.status_code == 201, purchase.text
 
     sale = client.post(
         "/api/sales",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product["id"], weight=4, rate=110),
     )
     assert sale.status_code == 201, sale.text
@@ -192,7 +192,7 @@ def test_sale_reduces_stock_and_rejects_excess_sale(client):
     # Only 6 grams remain at Main Store.
     excessive_sale = client.post(
         "/api/sales",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product["id"], weight=7, rate=110),
     )
 
@@ -210,7 +210,7 @@ def test_invalid_weight_combination_is_rejected(client):
 
     response = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=payload,
     )
 
@@ -222,7 +222,7 @@ def test_payment_cannot_exceed_transaction_total(client):
 
     purchase = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product["id"], weight=10, rate=100),
     )
     assert purchase.status_code == 201, purchase.text

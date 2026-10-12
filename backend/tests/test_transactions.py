@@ -1,3 +1,4 @@
+from helpers import login_headers
 from datetime import date
 
 from test_api import API_HEADERS, create_product, transaction_payload
@@ -6,7 +7,7 @@ from test_api import API_HEADERS, create_product, transaction_payload
 def create_purchase(client, product_id, weight=5):
     response = client.post(
         "/api/purchases",
-        headers=API_HEADERS,
+        headers=login_headers(client, "operator"),
         json=transaction_payload(product_id, weight=weight, rate=100),
     )
     assert response.status_code == 201, response.text
