@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import require_api_key
+from app.core.permissions import MANAGE_ROLES, READ_ROLES, require_roles
 from app.db.session import get_db
 from app.models.metal_rate import MetalRate
 from app.schemas.rate import RateCreate, RateOut
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/rates", tags=["Metal Rates"])
     "",
     response_model=RateOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_roles(*MANAGE_ROLES))],
 )
 def create_rate(
     payload: RateCreate,
@@ -42,7 +42,11 @@ def create_rate(
     return new_rate
 
 
-@router.get("", response_model=list[RateOut])
+@router.get(
+    "",
+    response_model=list[RateOut],
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def list_rates(
     metal: str | None = None,
     active_only: bool = True,
@@ -67,7 +71,11 @@ def list_rates(
     return db.scalars(statement).all()
 
 
-@router.get("/{rate_id}", response_model=RateOut)
+@router.get(
+    "/{rate_id}",
+    response_model=RateOut,
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def get_rate(
     rate_id: int,
     db: Session = Depends(get_db),

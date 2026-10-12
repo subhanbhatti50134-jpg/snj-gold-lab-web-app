@@ -94,7 +94,7 @@ def test_product_creation_requires_api_key(client):
 def test_rate_history_keeps_only_latest_rate_active(client):
     first = client.post(
         "/api/rates",
-        headers=API_HEADERS,
+        headers=login_headers(client),
         json={
             "metal": "gold",
             "purity": 100,
@@ -107,7 +107,7 @@ def test_rate_history_keeps_only_latest_rate_active(client):
 
     second = client.post(
         "/api/rates",
-        headers=API_HEADERS,
+        headers=login_headers(client),
         json={
             "metal": "gold",
             "purity": 100,
@@ -121,6 +121,7 @@ def test_rate_history_keeps_only_latest_rate_active(client):
     active_rates = client.get(
         "/api/rates",
         params={"metal": "gold", "active_only": "true"},
+        headers=login_headers(client, "viewer"),
     )
     assert active_rates.status_code == 200
     assert len(active_rates.json()) == 1
@@ -129,6 +130,7 @@ def test_rate_history_keeps_only_latest_rate_active(client):
     history = client.get(
         "/api/rates",
         params={"metal": "gold", "active_only": "false"},
+        headers=login_headers(client, "viewer"),
     )
     assert history.status_code == 200
 
