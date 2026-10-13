@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Numeric, String
+from sqlalchemy import CheckConstraint, Boolean, DateTime, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,6 +14,17 @@ def utc_now():
 
 class MetalRate(Base):
     __tablename__ = "metal_rates"
+
+    __table_args__ = (
+        CheckConstraint(
+            "purity >= 0 AND purity <= 100",
+            name="ck_metal_rates_purity",
+        ),
+        CheckConstraint(
+            "rate_per_gram > 0 AND entered_rate >= 0",
+            name="ck_metal_rates_rate",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     metal: Mapped[str] = mapped_column(String(20), index=True)

@@ -395,3 +395,176 @@ def test_pg_concurrent_sales_cannot_oversell(
         if row["product_id"] == product["id"]
     )
     assert total == Decimal("0")
+
+
+def test_pg_check_constraints_and_report_indexes_exist(
+    pg_engine, pg_session_factory
+):
+    """The Phase 12 constraints and indexes must be present in the schema.
+
+    They are declared on the SQLAlchemy models, so `create_all` (used by
+    the test fixture and by fresh installs) must reproduce them. This
+    guards against a future model edit silently dropping a guard.
+    """
+    expected_constraints = {
+        "ck_transactions_weights",
+        "ck_transactions_purity",
+        "ck_transactions_amounts",
+        "ck_payments_amount_nonzero",
+        "ck_metal_rates_purity",
+        "ck_metal_rates_rate",
+        "ck_products_purity",
+        "ck_stock_movements_delta_nonzero",
+    }
+    expected_indexes = {
+        "ix_transactions_kind_status_date",
+        "ix_transactions_party_date",
+    }
+
+    with pg_engine.connect() as conn:
+        constraints = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conname LIKE 'ck\\_%' "
+                    "AND connamespace = "
+                    "(SELECT oid FROM pg_namespace WHERE nspname = :schema)"
+                ),
+                {"schema": SCHEMA},
+            )
+        }
+        indexes = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT indexname FROM pg_indexes "
+                    "WHERE schemaname = :schema"
+                ),
+                {"schema": SCHEMA},
+            )
+        }
+
+    assert expected_constraints <= constraints, (
+        f"missing constraints: {expected_constraints - constraints}"
+    )
+    assert expected_indexes <= indexes, (
+        f"missing indexes: {expected_indexes - indexes}"
+    )
+
+
+def test_pg_constraints_reject_invalid_rows(pg_engine):
+    """A raw SQL insert that breaks a business rule must be rejected.
+
+    This proves the guards are enforced by PostgreSQL itself, not only by
+    the Pydantic schemas / service layer.
+    """
+    from app.db.base import Base
+    import app.models  # noqa: F401
+
+    Base.metadata.drop_all(bind=pg_engine)
+    Base.metadata.create_all(bind=pg_engine)
+
+    with pg_engine.begin() as conn:
+        # Minimal parent rows so the child inserts have something to
+        # reference. product_id 1 must exist for the transaction insert.
+        conn.execute(
+            text(
+                "INSERT INTO products (sku, name, category, metal, purity, "
+                "active, created_at) "
+                "VALUES ('PGCHK', 'pg check', 'loose_metal', 'gold', 99.9, "
+                "true, now())"
+            )
+        )
+
+    with pg_engine.begin() as conn:
+        product_id = conn.execute(
+            text("SELECT id FROM products WHERE sku = 'PGCHK'")
+        ).scalar()
+
+    cases = [
+        (
+            "negative weight",
+            "INSERT INTO transactions (reference, kind, product_id, "
+            "quantity_grams, gross_weight_grams, net_weight_grams, "
+            "deduction_grams, purity, rate_per_gram, charges, "
+            "total_amount, amount_paid, party_name, location, notes, "
+            "created_by, status, created_at, transaction_date) "
+            "VALUES ('PG-BAD-W', 'sale', :pid, -1, 1, 1, 0, 99, 100, 0, "
+            "100, 0, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "ck_transactions_weights",
+        ),
+        (
+            "paid exceeds total",
+            "INSERT INTO transactions (reference, kind, product_id, "
+            "quantity_grams, gross_weight_grams, net_weight_grams, "
+            "deduction_grams, purity, rate_per_gram, charges, "
+            "total_amount, amount_paid, party_name, location, notes, "
+            "created_by, status, created_at, transaction_date) "
+            "VALUES ('PG-BAD-P', 'sale', :pid, 1, 1, 1, 0, 99, 100, 0, "
+            "100, 500, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "ck_transactions_amounts",
+        ),
+        (
+            "purity out of range",
+            "INSERT INTO transactions (reference, kind, product_id, "
+            "quantity_grams, gross_weight_grams, net_weight_grams, "
+            "deduction_grams, purity, rate_per_gram, charges, "
+            "total_amount, amount_paid, party_name, location, notes, "
+            "created_by, status, created_at, transaction_date) "
+            "VALUES ('PG-BAD-U', 'sale', :pid, 1, 1, 1, 0, 150, 100, 0, "
+            "100, 0, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "ck_transactions_purity",
+        ),
+    ]
+
+    for label, sql, constraint in cases:
+        with pg_engine.connect() as conn:
+            with pytest.raises(Exception) as excinfo:
+                conn.execute(text(sql), {"pid": product_id})
+                conn.commit()
+            assert constraint in str(excinfo.value), (
+                f"{label}: expected {constraint}, got {excinfo.value}"
+            )
+
+    # Insert one valid transaction so the payment checks have a parent row.
+    with pg_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO transactions (reference, kind, product_id, "
+                "quantity_grams, gross_weight_grams, net_weight_grams, "
+                "deduction_grams, purity, rate_per_gram, charges, "
+                "total_amount, amount_paid, party_name, location, notes, "
+                "created_by, status, created_at, transaction_date) "
+                "VALUES ('PG-OK', 'sale', :pid, 1, 1, 1, 0, 99, 100, 0, "
+                "100, 50, '', 'Main', '', 't', 'active', now(), "
+                "'2026-01-01')"
+            ),
+            {"pid": product_id},
+        )
+        txn_id = conn.execute(
+            text("SELECT id FROM transactions WHERE reference = 'PG-OK'")
+        ).scalar()
+
+    with pg_engine.connect() as conn:
+        with pytest.raises(Exception) as excinfo:
+            conn.execute(
+                text(
+                    "INSERT INTO payments (transaction_id, amount, method, "
+                    "note, paid_at, recorded_by) "
+                    "VALUES (:tid, 0, 'cash', '', now(), 't')"
+                ),
+                {"tid": txn_id},
+            )
+            conn.commit()
+        assert "ck_payments_amount_nonzero" in str(excinfo.value)
+
+    with pg_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO payments (transaction_id, amount, method, "
+                "note, paid_at, recorded_by) "
+                "VALUES (:tid, -50, 'other', 'refund', now(), 't')"
+            ),
+            {"tid": txn_id},
+        )

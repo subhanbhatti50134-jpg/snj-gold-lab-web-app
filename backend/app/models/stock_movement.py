@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -13,6 +13,12 @@ class StockMovement(Base):
 
     __table_args__ = (
         Index("ix_movement_product_location", "product_id", "location"),
+        # A zero-gram movement would be a no-op row that only pollutes
+        # the ledger; real entries always move stock in or out.
+        CheckConstraint(
+            "quantity_delta_grams <> 0",
+            name="ck_stock_movements_delta_nonzero",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

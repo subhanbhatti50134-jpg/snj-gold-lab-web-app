@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Numeric, String
+from sqlalchemy import CheckConstraint, Boolean, DateTime, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,6 +14,13 @@ def utc_now():
 
 class Product(Base):
     __tablename__ = "products"
+
+    __table_args__ = (
+        CheckConstraint(
+            "purity >= 0 AND purity <= 100",
+            name="ck_products_purity",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sku: Mapped[str] = mapped_column(String(60), unique=True, index=True)
