@@ -131,6 +131,8 @@ export default function App() {
 
   const refresh = useCallback(() => {
     setRefreshKey(key => key + 1);
+    setLoading(true);
+    window.setTimeout(() => setLoading(false), 500);
   }, []);
 
   async function submitLogin(event: FormEvent) {

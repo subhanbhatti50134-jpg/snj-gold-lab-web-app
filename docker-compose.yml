@@ -18,5 +18,33 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    container_name: hisabpro-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://hisabpro:${POSTGRES_PASSWORD}@db:5432/hisabpro
+      HISABPRO_API_KEY: ${HISABPRO_API_KEY:?Set HISABPRO_API_KEY in .env}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      HISABPRO_BACKUP_DIR: /app/backups
+    volumes:
+      - hisabpro_backups:/app/backups
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: hisabpro-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
 volumes:
   hisabpro_data:
+  hisabpro_backups:

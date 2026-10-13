@@ -23,6 +23,8 @@ PG_DATABASE_URL = os.environ.get("DATABASE_URL") or (
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["HISABPRO_API_KEY"] = "test-api-key"
 os.environ["JWT_SECRET_KEY"] = "test-only-jwt-secret-key-not-for-production"
+# Keep the shared in-memory login limiter out of the test suite.
+os.environ["HISABPRO_LOGIN_RATE_LIMIT"] = "0"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,7 +33,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # Register all ORM models
-from app.core.security import require_api_key
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app

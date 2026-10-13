@@ -202,7 +202,7 @@ def test_stock_decrease_cannot_exceed_available_stock(client):
     assert inventory_balance(client, product["id"]) == Decimal("2.0000")
 
 
-def test_movement_write_endpoints_require_api_key(client):
+def test_movement_write_endpoints_require_authentication(client):
     return_response = client.post(
         "/api/movements/sales-returns",
         json={

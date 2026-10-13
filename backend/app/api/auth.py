@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core import ratelimit
 from app.core.auth import (
     create_access_token,
     decode_access_token,
@@ -49,7 +50,21 @@ def get_current_user(
 
 
 @router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    data: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    # Limit failed attempts per client+username to slow down guessing.
+    client = request.client.host if request.client else "unknown"
+    limit_key = f"{client}:{data.username.strip().lower()}"
+
+    if ratelimit.is_blocked(limit_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed attempts. Try again in a minute.",
+        )
+
     user = db.query(User).filter(User.username == data.username).first()
 
     if (
@@ -57,10 +72,13 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         or not user.active
         or not verify_password(data.password, user.password_hash)
     ):
+        ratelimit.record_failure(limit_key)
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
         )
+
+    ratelimit.clear_failures(limit_key)
 
     return {
         "access_token": create_access_token(user.id),

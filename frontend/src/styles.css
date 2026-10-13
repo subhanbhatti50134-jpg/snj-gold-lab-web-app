@@ -20,6 +20,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .sidebar {
   width: 245px; position: fixed; inset: 0 auto 0 0; z-index: 5;
   padding: 24px 14px 16px; display: flex; flex-direction: column;
+  overflow-y: auto;
   background: var(--navy); color: #dce5f0;
 }
 .brand { display: flex; gap: 11px; align-items: center; padding: 0 9px 28px; }
@@ -112,12 +113,6 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .metric-card>span { display: block; color: #7e8a9b; font-size: 10px; }
 .metric-card strong { display: block; margin: 7px 0; overflow: hidden; color: #1c2b40; font: 800 clamp(15px,1.4vw,21px) Manrope,sans-serif; white-space: nowrap; text-overflow: ellipsis; }
 .metric-card small { display: block; color: #9aa4b1; font-size: 9px; }
-.rate-strip { display: flex; align-items: center; gap: 24px; padding: 15px 18px; margin-top: 14px; border: 1px solid var(--border); border-radius: 11px; background: white; }
-.rate-strip>div:first-child { min-width: 150px; }
-.rate-strip b { display: block; font-size: 11px; color: #2a394d; }
-.rate-strip small { display: block; margin-top: 5px; color: #919cac; font-size: 9px; }
-.rate-mini { flex: 1; padding-left: 19px; border-left: 1px solid #edf0f4; }
-.rate-mini b { margin-top: 4px; }
 .text-button { display: inline-flex; gap: 5px; align-items: center; border: 0; background: transparent; color: #9b7837; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .panel { min-width: 0; margin-top: 16px; overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: white; }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 19px; border-bottom: 1px solid #edf0f4; }
@@ -191,9 +186,6 @@ tbody tr:hover { background: #fcfdff; }
   .nav-item { justify-content: center; padding: 0; }
   .main { margin-left: 68px; }
   .hero-coin { right: 22px; opacity: .45; }
-  .rate-strip { flex-wrap: wrap; gap: 14px; }
-  .rate-strip>div:first-child { min-width: 100%; }
-  .rate-mini { padding-left: 0; border-left: 0; }
 }
 @media(max-width:580px) {
   .topbar { height: 58px; padding: 0 12px; }

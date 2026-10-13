@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, atLeast, type CurrentUser } from "../api";
 import type {InventoryRow, Product, Transaction} from "../types";
-import { Empty, Field, MetalTag, PanelHeading, pretty } from "../ui";
+import { Empty, Field, PanelHeading, pretty } from "../ui";
 
 type Tab = "return" | "adjustment" | "transfer";
 
@@ -328,7 +328,7 @@ export default function MovementsPage({
               <option value="">Select product</option>
               {activeProducts.map(p => (
                 <option key={p.id} value={p.id}>
-                  <MetalTag metal={p.metal} /> {p.name} ({p.sku})
+                  {p.name} ({p.sku})
                 </option>
               ))}
             </select>

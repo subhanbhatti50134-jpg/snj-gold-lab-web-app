@@ -77,6 +77,13 @@ Create the first admin account (interactive):
 .venv/bin/python scripts/create_admin.py
 ```
 
+Optional demo data (users `manager` / `operator` / `viewer` with password
+`DemoPass!1234`, plus products, rates, parties and sample transactions):
+
+```bash
+.venv/bin/python scripts/seed_demo.py
+```
+
 Start the API:
 
 ```bash
@@ -85,6 +92,18 @@ Start the API:
 
 - API docs: <http://127.0.0.1:8000/docs>
 - Health check: `GET /api/auth/me` (with a Bearer token)
+
+### Production notes
+
+- Run several workers: `uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4`
+- Put a TLS reverse proxy (nginx/Caddy) in front; set `CORS_ORIGINS` to the
+  exact frontend origin.
+- `lifespan` runs `create_all` as a dev convenience — in production run
+  `alembic upgrade head` and treat migrations as the source of truth.
+- Failed logins are limited per client+username
+  (`HISABPRO_LOGIN_RATE_LIMIT`, default 10/min, `0` disables).
+- Never commit `.env` or database dumps; backups live in `backups/`
+  (gitignored).
 
 ## 3. Frontend
 
@@ -129,7 +148,36 @@ cd frontend
 npm run build
 ```
 
-## 5. Backup & restore
+Browser end-to-end test (Playwright drives a real Chromium through
+login → dashboard → sale → cancel → role limits; starts uvicorn and
+`vite preview` itself):
+
+```bash
+cd frontend && npm run build && cd ../backend
+.venv/bin/pip install playwright
+.venv/bin/playwright install chromium
+.venv/bin/python scripts/e2e_browser.py
+```
+
+CI runs the SQLite tests, the PostgreSQL integration tests and the
+frontend build on every push (`.github/workflows/ci.yml`).
+
+## 5. Docker (optional)
+
+With Docker installed, the whole stack runs with one command (values come
+from the project `.env` file):
+
+```bash
+docker compose up --build -d
+```
+
+- Frontend: <http://localhost:8080> (nginx serves the build and proxies
+  `/api` to the backend)
+- Backend: <http://127.0.0.1:8000/docs>
+- PostgreSQL: `127.0.0.1:5432` (data in the `hisabpro_data` volume)
+- Backups inside the container land in the `hisabpro_backups` volume
+
+## 6. Backup & restore
 
 - Admin only: **Settings → Database backups → Create backup**
 - Files are written to `~/hisabpro/backups` (override with
@@ -144,7 +192,7 @@ pg_dump -Fc -h 127.0.0.1 -U hisabpro -d hisabpro -f backups/my-backup.dump
 pg_restore --clean --if-exists -h 127.0.0.1 -U hisabpro -d hisabpro backups/my-backup.dump
 ```
 
-## 6. Accounting rules
+## 7. Accounting rules
 
 - Sale totals = net weight × rate per gram × purity / 100 + charges.
 - A **sales return** reduces the customer's receivable.
@@ -155,7 +203,7 @@ pg_restore --clean --if-exists -h 127.0.0.1 -U hisabpro -d hisabpro backups/my-b
 - Cancelled transactions are excluded from summaries and outstanding reports,
   but their payments (including refunds) still appear in cashflow.
 
-## 7. Project layout
+## 8. Project layout
 
 ```
 backend/
@@ -181,7 +229,7 @@ frontend/
     App.tsx           # shell: login, sidebar, routing
 ```
 
-## 8. Environment variables
+## 9. Environment variables
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
@@ -190,4 +238,6 @@ frontend/
 | `JWT_SECRET_KEY` | backend `.env` | signing key for access tokens (required) |
 | `HISABPRO_API_KEY` | backend `.env` | legacy shared key (routers use JWT) |
 | `HISABPRO_BACKUP_DIR` | backend env | backup folder (default `~/hisabpro/backups`) |
+| `CORS_ORIGINS` | backend `.env` | comma-separated browser origins (default Vite dev) |
+| `HISABPRO_LOGIN_RATE_LIMIT` | backend `.env` | failed logins per client+username per minute (default 10, `0` off) |
 | `VITE_API_BASE_URL` | frontend `.env` | backend origin (default `http://127.0.0.1:8000`) |
