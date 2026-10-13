@@ -311,7 +311,15 @@ def restore_json_backup(db: Session, filename: str, confirm: str) -> dict:
         # Children first so foreign keys never block the wipe.
         for model in reversed(JSON_MODELS):
             db.execute(delete(model))
+        # Push the deletes to the database and drop the old rows from the
+        # session identity map so re-inserting the same primary keys is
+        # treated as fresh inserts (required on PostgreSQL).
+        db.flush()
+        db.expunge_all()
 
+        # Insert parents before children and flush after every table so a
+        # child row (e.g. payments) never references a parent that has not
+        # been written yet. JSON_MODELS is already ordered parent-first.
         for model in JSON_MODELS:
             table = model.__tablename__
             rows = data.get(table, [])
@@ -337,6 +345,7 @@ def restore_json_backup(db: Session, filename: str, confirm: str) -> dict:
                         }
                     )
                 )
+            db.flush()
             counts[table] = len(rows)
 
         db.commit()

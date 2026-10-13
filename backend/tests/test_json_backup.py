@@ -105,6 +105,80 @@ def test_json_backup_preserves_transaction_amounts(
     assert float(match[0]["total_amount"]) == float(total_before)
 
 
+def test_json_backup_restore_keeps_payments_linked_to_transactions(
+    client: TestClient, db: Session, auth_headers
+):
+    """Restore must re-insert transactions before their payments.
+
+    On PostgreSQL this guards the foreign key ordering: payments reference
+    transactions.id, so a restore that flushed payments first would fail
+    with a ForeignKeyViolation. SQLite does not enforce FKs by default, so
+    this test is only meaningful on the PostgreSQL integration run.
+    """
+    admin = auth_headers("admin")
+
+    product = create_product(client, admin, "JB-FK", "FK ordering metal")
+
+    # A purchase adds stock so the sale below has something to sell.
+    purchase = client.post(
+        "/api/purchases",
+        json={
+            "product_id": product["id"],
+            "quantity_grams": 10,
+            "gross_weight_grams": 10,
+            "net_weight_grams": 10,
+            "deduction_grams": 0,
+            "purity": 100,
+            "rate_per_gram": 3000,
+            "rate_unit": "gram",
+            "amount_paid": 30000,
+            "location": "Main Store",
+        },
+        headers=admin,
+    )
+    assert purchase.status_code == 201
+
+    # A sale with a partial payment creates a transaction + a payment row.
+    sale = client.post(
+        "/api/sales",
+        json={
+            "product_id": product["id"],
+            "quantity_grams": 5,
+            "gross_weight_grams": 5,
+            "net_weight_grams": 5,
+            "deduction_grams": 0,
+            "purity": 100,
+            "rate_per_gram": 3000,
+            "rate_unit": "gram",
+            "amount_paid": 10000,
+            "location": "Main Store",
+        },
+        headers=admin,
+    )
+    assert sale.status_code == 201
+    sale_id = sale.json()["id"]
+
+    created = client.post("/api/backups/json", headers=admin).json()
+    assert created["counts"]["transactions"] >= 1
+    assert created["counts"]["payments"] >= 1
+
+    # Restore over the live data. If payments were flushed before their
+    # parent transactions, PostgreSQL would reject the insert.
+    restored = client.post(
+        f"/api/backups/json/{created['filename']}/restore",
+        json={"confirm": created["filename"]},
+        headers=admin,
+    )
+    assert restored.status_code == 200
+    assert restored.json()["restored"] is True
+
+    # The sale and its payment must both survive, still linked.
+    transactions = client.get("/api/transactions", headers=admin).json()
+    match = [t for t in transactions if t["id"] == sale_id]
+    assert match, "restored sale is missing"
+    assert float(match[0]["amount_paid"]) == 10000.0
+
+
 def test_json_backup_download(
     client: TestClient, db: Session, auth_headers
 ):

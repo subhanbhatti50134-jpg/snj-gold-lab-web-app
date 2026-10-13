@@ -28,11 +28,10 @@ export default function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [creatingJsonBackup, setCreatingJsonBackup] = useState(false);
-  const [restoreTarget, setRestoreTarget] = useState<{
-    filename: string;
-    kind: "pgdump" | "json";
-  } | null>(null);
+  const [restorePickerOpen, setRestorePickerOpen] = useState(false);
+  const [selectedFilename, setSelectedFilename] = useState("");
   const [confirmText, setConfirmText] = useState("");
+  const [restoring, setRestoring] = useState(false);
 
   const isAdmin = atLeast(user, "admin");
 
@@ -143,12 +142,14 @@ export default function SettingsPage({
   }
 
   async function restore() {
-    if (!restoreTarget) return;
+    const picked = backups.find(b => b.filename === selectedFilename);
+    if (!picked) return;
 
+    setRestoring(true);
     const base =
-      restoreTarget.kind === "json"
-        ? `/api/backups/json/${encodeURIComponent(restoreTarget.filename)}`
-        : `/api/backups/${encodeURIComponent(restoreTarget.filename)}`;
+      picked.kind === "json"
+        ? `/api/backups/json/${encodeURIComponent(picked.filename)}`
+        : `/api/backups/${encodeURIComponent(picked.filename)}`;
 
     try {
       const result = await api<RestoreResult>(`${base}/restore`, {
@@ -160,11 +161,14 @@ export default function SettingsPage({
           ? `Restore complete: ${result.filename}`
           : "Restore reported no changes."
       );
-      setRestoreTarget(null);
+      setRestorePickerOpen(false);
+      setSelectedFilename("");
       setConfirmText("");
       bump();
     } catch (error) {
       fail(error);
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -237,23 +241,35 @@ export default function SettingsPage({
       <section className="panel">
         <PanelHeading
           title="Database backups"
-          subtitle="pg_dump files (full database) and JSON files (portable data), stored on the server (admin only)"
+          subtitle="JSON backups save all data to the backups folder. Restore lets you pick which one to load back."
           action={
             isAdmin ? (
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   className="primary-button"
-                  onClick={() => void createBackup()}
-                  disabled={creatingBackup}
-                >
-                  {creatingBackup ? "Creating…" : "Create backup"}
-                </button>
-                <button
-                  className="secondary-button"
                   onClick={() => void createJsonBackup()}
                   disabled={creatingJsonBackup}
                 >
-                  {creatingJsonBackup ? "Creating…" : "Create JSON backup"}
+                  {creatingJsonBackup ? "Creating…" : "Backup (JSON)"}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setSelectedFilename("");
+                    setConfirmText("");
+                    setRestorePickerOpen(true);
+                  }}
+                  disabled={backups.length === 0}
+                >
+                  Restore
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => void createBackup()}
+                  disabled={creatingBackup}
+                  title="Full PostgreSQL dump (requires pg_dump on server)"
+                >
+                  {creatingBackup ? "Creating…" : "Full DB dump"}
                 </button>
               </div>
             ) : null
@@ -293,11 +309,9 @@ export default function SettingsPage({
                       <button
                         className="text-button danger"
                         onClick={() => {
-                          setRestoreTarget({
-                            filename: b.filename,
-                            kind: b.kind
-                          });
+                          setSelectedFilename(b.filename);
                           setConfirmText("");
+                          setRestorePickerOpen(true);
                         }}
                       >
                         Restore
@@ -319,16 +333,12 @@ export default function SettingsPage({
         )}
       </section>
 
-      {restoreTarget && (
+      {restorePickerOpen && (
         <Modal
-          title={`Restore ${restoreTarget.filename}`}
-          subtitle="This OVERWRITES the current data. This cannot be undone."
-          onClose={() => setRestoreTarget(null)}
+          title="Restore a backup"
+          subtitle="This OVERWRITES the current data with the selected backup. This cannot be undone."
+          onClose={() => setRestorePickerOpen(false)}
         >
-          <p className="hint">
-            Type the exact filename to confirm:
-            <b> {restoreTarget.filename}</b>
-          </p>
           <form
             className="form-grid modal-form"
             onSubmit={e => {
@@ -336,29 +346,51 @@ export default function SettingsPage({
               void restore();
             }}
           >
-            <Field label="Confirmation">
-              <input
+            <Field label="Choose a backup">
+              <select
                 required
-                value={confirmText}
-                onChange={e => setConfirmText(e.target.value)}
-              />
+                value={selectedFilename}
+                onChange={e => {
+                  setSelectedFilename(e.target.value);
+                  setConfirmText("");
+                }}
+              >
+                <option value="" disabled>
+                  — Select backup —
+                </option>
+                {backups.map(b => (
+                  <option key={b.filename} value={b.filename}>
+                    {b.filename} · {b.kind === "json" ? "JSON data" : "pg_dump"} ·{" "}
+                    {(b.size_bytes / 1024 / 1024).toFixed(2)} MB ·{" "}
+                    {new Date(b.created_at).toLocaleString()}
+                  </option>
+                ))}
+              </select>
             </Field>
+            {selectedFilename && (
+              <Field label="Type the filename to confirm">
+                <input
+                  required
+                  placeholder={selectedFilename}
+                  value={confirmText}
+                  onChange={e => setConfirmText(e.target.value)}
+                />
+              </Field>
+            )}
             <div className="form-actions">
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => setRestoreTarget(null)}
+                onClick={() => setRestorePickerOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 className="primary-button"
-                disabled={confirmText !== restoreTarget.filename}
+                disabled={restoring || confirmText !== selectedFilename || !selectedFilename}
               >
-                {restoreTarget.kind === "json"
-                  ? "Restore data"
-                  : "Restore database"}
+                {restoring ? "Restoring…" : "Restore selected backup"}
               </button>
             </div>
           </form>
