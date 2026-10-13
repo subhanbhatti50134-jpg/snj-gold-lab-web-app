@@ -8,6 +8,7 @@ from app.models.payments import Payment
 from app.models.party import Party
 from app.models.audit import AuditLog
 from app.models.setting import Setting
+from app.models.idempotency import IdempotencyKey
 
 __all__ = [
     "Product",
@@ -19,4 +20,5 @@ __all__ = [
     "Party",
     "AuditLog",
     "Setting",
+    "IdempotencyKey",
 ]

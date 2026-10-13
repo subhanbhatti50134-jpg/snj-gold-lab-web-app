@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
-import { api, money, type CurrentUser } from "../api";
+import { api, money, newIdempotencyKey, type CurrentUser } from "../api";
 import type {MetalRate, Party, Product, RateUnit} from "../types";
 import { Empty, Field } from "../ui";
 
@@ -52,6 +52,10 @@ export default function PurchaseSalePage({
   const [form, setForm] = useState(blank("Main Store"));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Reused if a submit fails and is retried, so the server records the
+  // purchase/sale only once. Cleared after a success.
+  const submitKeyRef = useRef("");
 
   useEffect(() => {
     let cancelled = false;
@@ -172,10 +176,16 @@ export default function PurchaseSalePage({
     }
 
     try {
+      // Reuse the key on a retry so a double-submit cannot record twice.
+      if (!submitKeyRef.current) {
+        submitKeyRef.current = newIdempotencyKey();
+      }
       await api(`/api/${kind === "purchase" ? "purchases" : "sales"}`, {
         method: "POST",
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        idempotencyKey: submitKeyRef.current
       });
+      submitKeyRef.current = "";
       notice(
         kind === "purchase"
           ? "Purchase save ho gayi. Stock barh gaya."

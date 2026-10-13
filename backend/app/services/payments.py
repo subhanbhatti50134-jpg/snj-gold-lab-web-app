@@ -13,6 +13,8 @@ def record_payment(
     db: Session,
     transaction_id: int,
     payload: PaymentCreate,
+    *,
+    commit: bool = True,
 ) -> Payment:
     try:
         # Lock the transaction row so simultaneous payments cannot
@@ -64,8 +66,9 @@ def record_payment(
             ),
         )
 
-        db.commit()
-        db.refresh(payment)
+        if commit:
+            db.commit()
+            db.refresh(payment)
 
         return payment
 

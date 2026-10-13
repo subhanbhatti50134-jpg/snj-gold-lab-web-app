@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, money, qty, type CurrentUser } from "../api";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { api, money, newIdempotencyKey, qty, type CurrentUser } from "../api";
 import {
   allocatePayment,
   cartTotal,
@@ -54,6 +54,10 @@ export default function POSPage({
   const [notes, setNotes] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [result, setResult] = useState<CheckoutResult | null>(null);
+
+  // The same key is reused if a checkout fails and is retried, so the
+  // server records the sale only once. Cleared after a success.
+  const checkoutKeyRef = useRef("");
 
   useEffect(() => {
     let cancelled = false;
@@ -179,10 +183,16 @@ export default function POSPage({
     }));
 
     try {
+      // Reuse the key on a retry so a double-submit cannot sell twice.
+      if (!checkoutKeyRef.current) {
+        checkoutKeyRef.current = newIdempotencyKey();
+      }
       const rows = await api<{ reference: string }[]>("/api/sales/batch", {
         method: "POST",
-        body: JSON.stringify({ items })
+        body: JSON.stringify({ items }),
+        idempotencyKey: checkoutKeyRef.current
       });
+      checkoutKeyRef.current = "";
       setResult({
         references: rows.map(r => r.reference),
         total,

@@ -37,6 +37,22 @@ export function clearToken(): void {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
+// A unique key for one logical checkout/payment. Reuse the SAME key when
+// retrying a failed request so the server records it only once; generate
+// a new key for a genuinely new operation.
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers: 122 bits of randomness, UUID-shaped.
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export async function login(
   username: string,
   password: string
@@ -66,16 +82,27 @@ export async function login(
   sessionStorage.setItem(TOKEN_KEY, data.access_token);
 }
 
+export type ApiOptions = RequestInit & {
+  // Sent as the Idempotency-Key header so a retried POST is recorded
+  // only once on the server.
+  idempotencyKey?: string;
+};
+
 export async function api<T>(
   path: string,
-  options: RequestInit = {}
+  options: ApiOptions = {}
 ): Promise<T> {
-  const headers = new Headers(options.headers);
+  const { idempotencyKey, ...init } = options;
+  const headers = new Headers(init.headers);
 
   headers.set("Accept", "application/json");
 
-  if (options.body) {
+  if (init.body) {
     headers.set("Content-Type", "application/json");
+  }
+
+  if (idempotencyKey) {
+    headers.set("Idempotency-Key", idempotencyKey);
   }
 
   const token = getToken();
@@ -87,7 +114,7 @@ export async function api<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   } catch {
     throw new Error(`Backend connect nahi hua. Check karein: ${API_BASE}`);
   }

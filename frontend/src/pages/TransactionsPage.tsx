@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, atLeast, money, qty, type CurrentUser } from "../api";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  api,
+  atLeast,
+  money,
+  newIdempotencyKey,
+  qty,
+  type CurrentUser
+} from "../api";
 import type {Payment, Product, Transaction} from "../types";
 import {
   Empty,
@@ -41,6 +48,10 @@ export default function TransactionsPage({
   const [payMethod, setPayMethod] = useState("cash");
   const [payNote, setPayNote] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Reused if a payment submit fails and is retried, so the server
+  // records the payment only once. Cleared after a success.
+  const payKeyRef = useRef("");
 
   const canManage = atLeast(user, "manager");
   const canOperate = atLeast(user, "operator");
@@ -123,14 +134,20 @@ export default function TransactionsPage({
     setBusy(true);
 
     try {
+      // Reuse the key on a retry so a double-submit cannot pay twice.
+      if (!payKeyRef.current) {
+        payKeyRef.current = newIdempotencyKey();
+      }
       await api(`/api/transactions/${payTarget.id}/payments`, {
         method: "POST",
         body: JSON.stringify({
           amount: Number(payAmount),
           method: payMethod,
           note: payNote
-        })
+        }),
+        idempotencyKey: payKeyRef.current
       });
+      payKeyRef.current = "";
       notice("Payment record ho gayi.");
       const data = await api<Payment[]>(
         `/api/transactions/${payTarget.id}/payments`

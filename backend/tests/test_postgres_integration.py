@@ -397,6 +397,63 @@ def test_pg_concurrent_sales_cannot_oversell(
     assert total == Decimal("0")
 
 
+def test_pg_concurrent_idempotent_checkout_records_once(
+    pg_client, pg_admin_headers
+):
+    """Two simultaneous checkouts with the same key create ONE sale.
+
+    The unique constraint on idempotency_keys.key settles the race: the
+    loser rolls back and replays the winner's stored response.
+    """
+    product = _create_product(pg_client, pg_admin_headers)
+    _purchase(pg_client, pg_admin_headers, product["id"], 10, amount_paid=1000)
+
+    body = {
+        "items": [
+            {
+                "product_id": product["id"],
+                "quantity_grams": 1,
+                "gross_weight_grams": 1,
+                "net_weight_grams": 1,
+                "deduction_grams": 0,
+                "purity": 100,
+                "rate_per_gram": 100,
+                "rate_unit": "gram",
+                "amount_paid": 50,
+                "location": "Main Store",
+            }
+        ]
+    }
+    key = "pg-idem-race-key"
+    headers = {**pg_admin_headers, "Idempotency-Key": key}
+
+    def attempt():
+        response = pg_client.post(
+            "/api/sales/batch", json=body, headers=headers
+        )
+        return response.status_code, response.json()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: attempt(), range(2)))
+
+    # Both requests succeed; at least one is the original 201 and any
+    # duplicate replays the same reference. Crucially there is only one
+    # sale in the database.
+    statuses = [status for status, _ in results]
+    assert all(s in (200, 201) for s in statuses), results
+
+    references = {
+        data[0]["reference"] for _, data in results if isinstance(data, list)
+    }
+    assert len(references) == 1, results
+
+    sales = pg_client.get("/api/sales", headers=pg_admin_headers).json()
+    matching = [s for s in sales if s["product_id"] == product["id"]]
+    assert len(matching) == 1, (
+        f"expected exactly one sale, got {len(matching)}"
+    )
+
+
 def test_pg_check_constraints_and_report_indexes_exist(
     pg_engine, pg_session_factory
 ):
