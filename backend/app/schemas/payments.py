@@ -10,7 +10,7 @@ class PaymentCreate(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=16, decimal_places=2)
     method: Literal["cash", "bank_transfer", "other"] = "cash"
     note: str = Field(default="", max_length=2000)
-    recorded_by: str = Field(min_length=1, max_length=120)
+    recorded_by: str = Field(default="", max_length=120)
 
 
 class PaymentOut(BaseModel):

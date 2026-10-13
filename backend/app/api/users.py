@@ -9,14 +9,13 @@ from sqlalchemy.orm import Session
 from app.api.auth import get_current_user
 from app.core.auth import hash_password
 from app.core.permissions import require_roles
-from app.core.security import require_api_key
 from app.db.session import get_db
 from app.models.user import User
+from app.services.audit import log_audit
 
 router = APIRouter(
     prefix="/api/users",
     tags=["User Management"],
-    dependencies=[Depends(require_api_key)],
 )
 
 Role = Literal["admin", "manager", "operator", "viewer"]
@@ -61,6 +60,13 @@ def create_user(
     db.add(user)
 
     try:
+        log_audit(
+            db,
+            username=admin.username,
+            action="user.create",
+            entity_type="user",
+            detail=f"{data.username} as {data.role}",
+        )
         db.commit()
         db.refresh(user)
     except IntegrityError:
@@ -100,6 +106,15 @@ def update_user_role(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.role = data.role
+
+    log_audit(
+        db,
+        username=admin.username,
+        action="user.role_change",
+        entity_type="user",
+        entity_id=user.id,
+        detail=f"{user.username} -> {data.role}",
+    )
     db.commit()
     db.refresh(user)
     return user_data(user)
@@ -123,6 +138,15 @@ def update_user_active(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.active = data.active
+
+    log_audit(
+        db,
+        username=admin.username,
+        action="user.active_change",
+        entity_type="user",
+        entity_id=user.id,
+        detail=f"{user.username} -> active={data.active}",
+    )
     db.commit()
     db.refresh(user)
     return user_data(user)

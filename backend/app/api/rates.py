@@ -1,4 +1,6 @@
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,7 +8,10 @@ from sqlalchemy.orm import Session
 from app.core.permissions import MANAGE_ROLES, READ_ROLES, require_roles
 from app.db.session import get_db
 from app.models.metal_rate import MetalRate
+from app.models.user import User
 from app.schemas.rate import RateCreate, RateOut
+from app.services.audit import log_audit
+from app.services.pricing import normalize_rate
 
 router = APIRouter(prefix="/api/rates", tags=["Metal Rates"])
 
@@ -20,7 +25,16 @@ router = APIRouter(prefix="/api/rates", tags=["Metal Rates"])
 def create_rate(
     payload: RateCreate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
 ):
+    # Convert the entered rate (per gram/tola/kilogram) to the single
+    # internal unit: a rate per gram. Both values are stored so the
+    # history shows exactly what the operator typed.
+    try:
+        per_gram = normalize_rate(payload.rate_per_gram, payload.unit)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     # Keep the previous rate history, but deactivate the old
     # rate for the same metal and purity.
     old_rates = db.scalars(
@@ -34,8 +48,29 @@ def create_rate(
     for old_rate in old_rates:
         old_rate.active = False
 
-    new_rate = MetalRate(**payload.model_dump())
+    new_rate = MetalRate(
+        metal=payload.metal,
+        purity=payload.purity,
+        rate_per_gram=per_gram,
+        unit=payload.unit,
+        entered_rate=payload.rate_per_gram,
+        source_note=payload.source_note,
+        verified_by=payload.verified_by,
+        active=True,
+    )
     db.add(new_rate)
+
+    log_audit(
+        db,
+        username=user.username,
+        action="rate.create",
+        entity_type="metal_rate",
+        detail=(
+            f"{payload.metal} {payload.purity}%: "
+            f"{payload.rate_per_gram} per {payload.unit} "
+            f"(= {per_gram} per gram)"
+        ),
+    )
     db.commit()
     db.refresh(new_rate)
 

@@ -1,5 +1,5 @@
 from helpers import login_headers
-from test_api import API_HEADERS, create_product, transaction_payload
+from test_api import create_product, transaction_payload
 
 
 def create_transaction(client, kind, product_id, weight=5, amount_paid=0):
@@ -18,7 +18,7 @@ def create_transaction(client, kind, product_id, weight=5, amount_paid=0):
     return response.json()
 
 
-def test_cashflow_requires_api_key(client):
+def test_cashflow_requires_login(client):
     response = client.get("/api/reports/cashflow")
     assert response.status_code == 401
 
@@ -30,7 +30,7 @@ def test_cashflow_reports_sale_received_and_purchase_paid(client):
 
     response = client.get(
         "/api/reports/cashflow",
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
     assert response.status_code == 200, response.text
     data = response.json()
@@ -48,7 +48,7 @@ def test_cashflow_filters_by_payment_method(client):
     response = client.get(
         "/api/reports/cashflow",
         params={"method": "cash"},
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
     assert response.status_code == 200, response.text
     assert float(response.json()["money_paid"]) == 200
@@ -61,7 +61,7 @@ def test_cashflow_rejects_invalid_date_range(client):
             "date_from": "2026-10-12",
             "date_to": "2026-10-01",
         },
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
     assert response.status_code == 422
 
@@ -74,7 +74,7 @@ def test_cashflow_pagination(client):
     response = client.get(
         "/api/reports/cashflow",
         params={"skip": 0, "limit": 1},
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
     assert response.status_code == 200, response.text
     data = response.json()

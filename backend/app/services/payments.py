@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.models.payments import Payment
 from app.models.transaction import Transaction
 from app.schemas.payments import PaymentCreate
+from app.services.audit import log_audit
+
 
 def record_payment(
     db: Session,
@@ -23,6 +25,12 @@ def record_payment(
 
         if transaction is None:
             raise HTTPException(status_code=404, detail="Transaction not found")
+
+        if transaction.status != "active":
+            raise HTTPException(
+                status_code=409,
+                detail="Payments cannot be recorded against a cancelled transaction",
+            )
 
         remaining = transaction.total_amount - transaction.amount_paid
 
@@ -42,6 +50,20 @@ def record_payment(
 
         transaction.amount_paid += payload.amount
         db.add(payment)
+        db.flush()
+
+        log_audit(
+            db,
+            username=payload.recorded_by,
+            action="payment.create",
+            entity_type="payment",
+            entity_id=payment.id,
+            detail=(
+                f"{payload.amount} ({payload.method}) against "
+                f"{transaction.reference}"
+            ),
+        )
+
         db.commit()
         db.refresh(payment)
 

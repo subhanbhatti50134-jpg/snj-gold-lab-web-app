@@ -1,5 +1,5 @@
 from helpers import login_headers
-from test_api import API_HEADERS, create_product, transaction_payload
+from test_api import create_product, transaction_payload
 
 
 def create_purchase(client, product_id, weight=5, amount_paid=0):
@@ -15,7 +15,7 @@ def create_purchase(client, product_id, weight=5, amount_paid=0):
     return response.json()
 
 
-def test_reports_require_api_key(client):
+def test_reports_require_login(client):
     for endpoint in (
         "/api/reports/summary",
         "/api/reports/outstanding",
@@ -25,13 +25,22 @@ def test_reports_require_api_key(client):
         assert response.status_code == 401, (endpoint, response.text)
 
 
+def test_reports_forbid_anonymous_writes(client):
+    # Read endpoints must not accept a bare API key either.
+    response = client.get(
+        "/api/reports/summary",
+        headers={"X-API-Key": "test-api-key"},
+    )
+    assert response.status_code == 401
+
+
 def test_summary_reports_purchase_total_and_due(client):
     product = create_product(client)
     create_purchase(client, product["id"], weight=5, amount_paid=200)
 
     response = client.get(
         "/api/reports/summary",
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
 
     assert response.status_code == 200, response.text
@@ -51,7 +60,7 @@ def test_outstanding_report_lists_unpaid_purchase(client):
     response = client.get(
         "/api/reports/outstanding",
         params={"kind": "purchase"},
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
 
     assert response.status_code == 200, response.text
@@ -72,7 +81,7 @@ def test_party_ledger_returns_transaction(client):
     response = client.get(
         "/api/reports/party-ledger",
         params={"party_name": "Test Customer"},
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
 
     assert response.status_code == 200, response.text
@@ -89,7 +98,7 @@ def test_summary_rejects_invalid_date_range(client):
             "date_from": "2026-10-12",
             "date_to": "2026-10-01",
         },
-        headers=API_HEADERS,
+        headers=login_headers(client, "viewer"),
     )
 
     assert response.status_code == 422

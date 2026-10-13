@@ -18,6 +18,11 @@ from app.api.reports import router as reports_router
 from app.api.cashflow import router as cashflow_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
+from app.api.parties import router as parties_router
+from app.api.audit import router as audit_router
+from app.api.settings import router as settings_router
+from app.api.backup import router as backup_router
+from app.api.dashboard import router as dashboard_router
 import app.models  # noqa: F401 - registers all ORM models
 
 
@@ -55,6 +60,11 @@ app.include_router(movements_router)
 app.include_router(reports_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(parties_router)
+app.include_router(audit_router)
+app.include_router(settings_router)
+app.include_router(backup_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health")

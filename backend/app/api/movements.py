@@ -7,16 +7,18 @@ from app.models.user import User
 from app.schemas.movements import (
     SalesReturnCreate,
     StockAdjustmentCreate,
+    StockTransferCreate,
 )
 from app.schemas.transaction import TransactionOut
 from app.services.movements import (
     create_sales_return,
     create_stock_adjustment,
+    create_stock_transfer,
 )
 
 router = APIRouter(
     prefix="/api/movements",
-    tags=["Sales Returns & Stock Adjustments"],
+    tags=["Returns, Adjustments & Transfers"],
 )
 
 
@@ -47,3 +49,17 @@ def add_stock_adjustment(
 ):
     payload = payload.model_copy(update={"created_by": user.username})
     return create_stock_adjustment(db, payload)
+
+
+@router.post(
+    "/transfers",
+    response_model=TransactionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_stock_transfer(
+    payload: StockTransferCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
+):
+    payload = payload.model_copy(update={"created_by": user.username})
+    return create_stock_transfer(db, payload)

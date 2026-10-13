@@ -11,9 +11,12 @@ from app.models.transaction import Transaction
 from app.schemas.movements import (
     SalesReturnCreate,
     StockAdjustmentCreate,
+    StockTransferCreate,
 )
+from app.services.audit import log_audit
 from app.services.inventory import get_stock_balance
 from app.services.pricing import calculate_total
+from app.services.settings import get_bool_setting
 
 
 def create_sales_return(
@@ -30,6 +33,12 @@ def create_sales_return(
         raise HTTPException(
             status_code=404,
             detail="Original sale transaction not found",
+        )
+
+    if original.status != "active":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot return a cancelled sale",
         )
 
     if not original.reference:
@@ -56,6 +65,7 @@ def create_sales_return(
         ).where(
             Transaction.kind == "sales_return",
             Transaction.destination == original.reference,
+            Transaction.status == "active",
         )
     )
     returned_before = Decimal(str(returned_before or "0"))
@@ -85,6 +95,7 @@ def create_sales_return(
             reference=f"RET-{uuid4().hex[:12].upper()}",
             kind="sales_return",
             product_id=original.product_id,
+            party_id=original.party_id,
             quantity_grams=payload.quantity_grams,
             gross_weight_grams=payload.quantity_grams,
             net_weight_grams=payload.quantity_grams,
@@ -112,6 +123,18 @@ def create_sales_return(
                 location=original.location,
                 quantity_delta_grams=payload.quantity_grams,
             )
+        )
+
+        log_audit(
+            db,
+            username=payload.created_by,
+            action="sales_return.create",
+            entity_type="transaction",
+            entity_id=returned.id,
+            detail=(
+                f"{returned.reference} against {original.reference}; "
+                f"{payload.quantity_grams}g"
+            ),
         )
 
         db.commit()
@@ -142,7 +165,9 @@ def create_stock_adjustment(
             detail="Active product not found",
         )
 
-    if payload.direction == "decrease":
+    allow_negative = get_bool_setting(db, "allow_negative_stock")
+
+    if payload.direction == "decrease" and not allow_negative:
         available = get_stock_balance(
             db, payload.product_id, payload.location
         )
@@ -196,9 +221,121 @@ def create_stock_adjustment(
             )
         )
 
+        log_audit(
+            db,
+            username=payload.created_by,
+            action="stock_adjustment.create",
+            entity_type="transaction",
+            entity_id=adjustment.id,
+            detail=(
+                f"{adjustment.reference}; {payload.direction} "
+                f"{payload.quantity_grams}g at {payload.location}; "
+                f"reason: {payload.reason}"
+            ),
+        )
+
         db.commit()
         db.refresh(adjustment)
         return adjustment
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+def create_stock_transfer(
+    db: Session,
+    payload: StockTransferCreate,
+) -> Transaction:
+    """Move stock between locations.
+
+    Two movements are written in one database transaction: minus at the
+    source, plus at the destination, so the total never changes.
+    """
+    product = db.scalar(
+        select(Product)
+        .where(Product.id == payload.product_id)
+        .with_for_update()
+    )
+
+    if product is None or not product.active:
+        raise HTTPException(
+            status_code=404,
+            detail="Active product not found",
+        )
+
+    source = payload.from_location.strip()
+    destination = payload.to_location.strip()
+    allow_negative = get_bool_setting(db, "allow_negative_stock")
+
+    if not allow_negative:
+        available = get_stock_balance(db, payload.product_id, source)
+        if payload.quantity_grams > available:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Transfer exceeds available stock. "
+                    f"Available at {source}: {available} grams"
+                ),
+            )
+
+    try:
+        transfer = Transaction(
+            reference=f"TRF-{uuid4().hex[:12].upper()}",
+            kind="stock_transfer",
+            product_id=product.id,
+            quantity_grams=payload.quantity_grams,
+            gross_weight_grams=payload.quantity_grams,
+            net_weight_grams=payload.quantity_grams,
+            deduction_grams=Decimal("0"),
+            purity=product.purity,
+            rate_id=None,
+            rate_per_gram=Decimal("0"),
+            charges=Decimal("0"),
+            total_amount=Decimal("0"),
+            amount_paid=Decimal("0"),
+            party_name="",
+            location=source,
+            destination=destination,
+            notes=payload.notes,
+            created_by=payload.created_by,
+        )
+
+        db.add(transfer)
+        db.flush()
+
+        db.add(
+            StockMovement(
+                transaction_id=transfer.id,
+                product_id=product.id,
+                location=source,
+                quantity_delta_grams=-payload.quantity_grams,
+            )
+        )
+        db.add(
+            StockMovement(
+                transaction_id=transfer.id,
+                product_id=product.id,
+                location=destination,
+                quantity_delta_grams=payload.quantity_grams,
+            )
+        )
+
+        log_audit(
+            db,
+            username=payload.created_by,
+            action="stock_transfer.create",
+            entity_type="transaction",
+            entity_id=transfer.id,
+            detail=(
+                f"{transfer.reference}; {payload.quantity_grams}g "
+                f"{source} -> {destination}"
+            ),
+        )
+
+        db.commit()
+        db.refresh(transfer)
+        return transfer
 
     except Exception:
         db.rollback()

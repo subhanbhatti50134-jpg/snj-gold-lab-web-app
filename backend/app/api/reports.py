@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.security import require_api_key
+from app.core.permissions import READ_ROLES, require_roles
 from app.db.session import get_db
 from app.models.payments import Payment
 from app.models.transaction import Transaction
@@ -13,7 +13,6 @@ from app.models.transaction import Transaction
 router = APIRouter(
     prefix="/api/reports",
     tags=["Financial Reports"],
-    dependencies=[Depends(require_api_key)],
 )
 
 ZERO = Decimal("0.00")
@@ -39,7 +38,10 @@ def validate_dates(date_from, date_to):
         )
 
 
-@router.get("/summary")
+@router.get(
+    "/summary",
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def financial_summary(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
@@ -53,7 +55,10 @@ def financial_summary(
         query = db.query(
             func.coalesce(func.sum(Transaction.total_amount), 0),
             func.coalesce(func.sum(Transaction.amount_paid), 0),
-        ).filter(Transaction.kind == kind)
+        ).filter(
+            Transaction.kind == kind,
+            Transaction.status == "active",
+        )
 
         query = apply_date_filter(
             query, Transaction.created_at, date_from, date_to
@@ -71,20 +76,25 @@ def financial_summary(
 
     result["sales_returns"] = {
         "count": db.query(Transaction).filter(
-            Transaction.kind == "sales_return"
+            Transaction.kind == "sales_return",
+            Transaction.status == "active",
         ).count()
     }
 
     result["stock_adjustments"] = {
         "count": db.query(Transaction).filter(
-            Transaction.kind == "stock_adjustment"
+            Transaction.kind == "stock_adjustment",
+            Transaction.status == "active",
         ).count()
     }
 
     return result
 
 
-@router.get("/outstanding")
+@router.get(
+    "/outstanding",
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def outstanding_report(
     kind: str | None = Query(default=None, pattern="^(purchase|sale)$"),
     party_name: str | None = Query(default=None, max_length=160),
@@ -98,6 +108,7 @@ def outstanding_report(
 
     query = db.query(Transaction).filter(
         Transaction.kind.in_(("purchase", "sale")),
+        Transaction.status == "active",
         Transaction.total_amount > Transaction.amount_paid,
     )
 
@@ -144,7 +155,10 @@ def outstanding_report(
     }
 
 
-@router.get("/party-ledger")
+@router.get(
+    "/party-ledger",
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def party_ledger(
     party_name: str = Query(min_length=1, max_length=160),
     date_from: date | None = Query(default=None),
@@ -156,6 +170,7 @@ def party_ledger(
     query = db.query(Transaction).filter(
         Transaction.party_name.ilike(party_name.strip()),
         Transaction.kind.in_(("purchase", "sale", "sales_return")),
+        Transaction.status == "active",
     )
 
     query = apply_date_filter(

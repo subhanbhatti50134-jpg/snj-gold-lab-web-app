@@ -7,6 +7,18 @@ if str(BACKEND_DIR) not in sys.path:
 
 import os
 
+# Captured before the SQLite override below: PostgreSQL integration
+# tests reconnect using this real URL when HISABPRO_PG_TESTS=1.
+# Fall back to the project .env file when DATABASE_URL is not exported.
+from pathlib import Path
+
+from dotenv import dotenv_values
+
+_PROJECT_ENV = Path(__file__).resolve().parents[2] / ".env"
+PG_DATABASE_URL = os.environ.get("DATABASE_URL") or (
+    dotenv_values(_PROJECT_ENV).get("DATABASE_URL", "")
+)
+
 # Set test configuration before importing the application.
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["HISABPRO_API_KEY"] = "test-api-key"

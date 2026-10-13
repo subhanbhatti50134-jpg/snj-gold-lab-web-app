@@ -5,6 +5,9 @@ from app.models.transaction import Transaction
 from app.models.stock_movement import StockMovement
 from app.models.user import User
 from app.models.payments import Payment
+from app.models.party import Party
+from app.models.audit import AuditLog
+from app.models.setting import Setting
 
 __all__ = [
     "Product",
@@ -13,4 +16,7 @@ __all__ = [
     "StockMovement",
     "User",
     "Payment",
+    "Party",
+    "AuditLog",
+    "Setting",
 ]

@@ -4,7 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.security import require_api_key
+from app.core.permissions import READ_ROLES, require_roles
 from app.db.session import get_db
 from app.models.payments import Payment
 from app.models.transaction import Transaction
@@ -12,7 +12,6 @@ from app.models.transaction import Transaction
 router = APIRouter(
     prefix="/api/reports/cashflow",
     tags=["Cashflow Report"],
-    dependencies=[Depends(require_api_key)],
 )
 
 
@@ -31,7 +30,10 @@ def date_bounds(date_from: date | None, date_to: date | None):
     return start, end
 
 
-@router.get("")
+@router.get(
+    "",
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def cashflow_report(
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),

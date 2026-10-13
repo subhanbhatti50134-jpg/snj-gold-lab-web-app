@@ -4,6 +4,39 @@ from decimal import Decimal, ROUND_HALF_UP
 
 MONEY_PLACES = Decimal("0.01")
 
+# Weight-unit conversion factors used to normalize entered rates and
+# weights to grams, which is the single internal unit of account.
+GRAMS_PER_TOLA = Decimal("11.6638")
+GRAMS_PER_KILOGRAM = Decimal("1000")
+UNIT_GRAMS = {
+    "gram": Decimal("1"),
+    "tola": GRAMS_PER_TOLA,
+    "kilogram": GRAMS_PER_KILOGRAM,
+}
+
+
+def to_grams(value: Decimal, unit: str) -> Decimal:
+    """Convert a weight expressed in `unit` into grams."""
+    factor = UNIT_GRAMS.get(unit)
+    if factor is None:
+        raise ValueError(f"Unsupported weight unit: {unit}")
+    return value * factor
+
+
+def normalize_rate(rate: Decimal, unit: str) -> Decimal:
+    """Convert a rate entered per `unit` into a rate per gram.
+
+    A rate is stored per unit of weight, e.g. 100000 per tola means
+    100000 PKR for 11.6638 grams, so the per-gram rate is
+    100000 / 11.6638.
+    """
+    if rate <= 0:
+        raise ValueError("Rate must be greater than zero")
+    factor = UNIT_GRAMS.get(unit)
+    if factor is None:
+        raise ValueError(f"Unsupported rate unit: {unit}")
+    return rate / factor
+
 
 def money(value: Decimal) -> Decimal:
     """Round a monetary amount to two decimal places."""

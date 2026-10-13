@@ -82,9 +82,10 @@ def test_admin_can_create_user(client, db):
     assert "password_hash" not in response.json()
 
 
-def test_user_management_requires_api_key(client, db):
+def test_user_management_requires_login(client, db):
     headers = admin_headers(client, db)
     headers.pop("X-API-Key")
+    headers.pop("Authorization")
 
     response = client.get("/api/users", headers=headers)
 

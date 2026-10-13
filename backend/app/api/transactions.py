@@ -4,16 +4,18 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.security import require_api_key
+from app.core.permissions import MANAGE_ROLES, READ_ROLES, require_roles
 from app.db.session import get_db
 from app.models.product import Product
 from app.models.transaction import Transaction
+from app.models.user import User
+from app.schemas.movements import TransactionCancel
 from app.schemas.transaction import TransactionOut
+from app.services.reversals import cancel_transaction
 
 router = APIRouter(
     prefix="/api/transactions",
     tags=["Transaction History"],
-    dependencies=[Depends(require_api_key)],
 )
 
 TransactionKind = Literal[
@@ -21,12 +23,18 @@ TransactionKind = Literal[
     "sale",
     "sales_return",
     "stock_adjustment",
+    "stock_transfer",
 ]
 
 
-@router.get("", response_model=list[TransactionOut])
+@router.get(
+    "",
+    response_model=list[TransactionOut],
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
 def get_transactions(
     kind: TransactionKind | None = Query(default=None),
+    status: Literal["active", "cancelled", "all"] = Query(default="active"),
     search: str | None = Query(default=None, min_length=1, max_length=160),
     product_id: int | None = Query(default=None, gt=0),
     location: str | None = Query(default=None, min_length=1, max_length=100),
@@ -56,6 +64,9 @@ def get_transactions(
     if kind is not None:
         query = query.filter(Transaction.kind == kind)
 
+    if status != "all":
+        query = query.filter(Transaction.status == status)
+
     if product_id is not None:
         query = query.filter(Transaction.product_id == product_id)
 
@@ -79,4 +90,24 @@ def get_transactions(
         .offset(skip)
         .limit(limit)
         .all()
+    )
+
+
+@router.post(
+    "/{transaction_id}/cancel",
+    response_model=TransactionOut,
+)
+def cancel(
+    transaction_id: int,
+    payload: TransactionCancel,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
+):
+    """Cancel a transaction using reversal entries, never deletion."""
+    return cancel_transaction(
+        db,
+        transaction_id,
+        reason=payload.reason,
+        username=user.username,
+        include_payments=payload.include_payments,
     )

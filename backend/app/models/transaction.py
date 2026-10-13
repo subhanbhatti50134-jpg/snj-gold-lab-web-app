@@ -26,6 +26,9 @@ class Transaction(Base):
     product_id: Mapped[int] = mapped_column(
         ForeignKey("products.id")
     )
+    party_id: Mapped[int | None] = mapped_column(
+        ForeignKey("parties.id"), nullable=True, index=True
+    )
 
     quantity_grams: Mapped[Decimal] = mapped_column(Numeric(16, 4))
     gross_weight_grams: Mapped[Decimal] = mapped_column(Numeric(16, 4))
@@ -52,6 +55,19 @@ class Transaction(Base):
     )
     notes: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(120))
+
+    # "active" rows feed reports; "cancelled" rows are kept for audit
+    # history and are excluded from balances and stock.
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", index=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_by: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, index=True

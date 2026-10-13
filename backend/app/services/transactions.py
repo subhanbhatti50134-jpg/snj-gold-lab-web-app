@@ -8,13 +8,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.metal_rate import MetalRate
+from app.models.party import Party
 from app.models.payments import Payment
 from app.models.product import Product
 from app.models.stock_movement import StockMovement
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate
+from app.services.audit import log_audit
 from app.services.inventory import get_stock_balance
-from app.services.pricing import calculate_total
+from app.services.pricing import calculate_total, normalize_rate
+from app.services.settings import get_bool_setting
+
+
+def _resolve_party(
+    db: Session, payload: TransactionCreate
+) -> tuple[int | None, str]:
+    """Prefer the linked party record; its name is the server's copy."""
+    if payload.party_id is None:
+        return None, payload.party_name.strip()
+
+    party = db.get(Party, payload.party_id)
+
+    if party is None or not party.active:
+        raise HTTPException(status_code=404, detail="Active party not found")
+
+    return party.id, party.name
 
 
 def create_transaction(
@@ -35,8 +53,16 @@ def create_transaction(
     if product is None or not product.active:
         raise HTTPException(status_code=404, detail="Active product not found")
 
+    party_id, party_name = _resolve_party(db, payload)
+
     rate = None
-    rate_per_gram = payload.rate_per_gram
+    # Normalize the client-entered rate to grams first so the value is
+    # comparable with the stored per-gram rate.
+    rate_per_gram = (
+        normalize_rate(payload.rate_per_gram, payload.rate_unit)
+        if payload.rate_per_gram is not None
+        else None
+    )
 
     if payload.rate_id is not None:
         rate = db.get(MetalRate, payload.rate_id)
@@ -83,7 +109,9 @@ def create_transaction(
             detail="Amount paid cannot exceed transaction total",
         )
 
-    if kind == "sale":
+    allow_negative = get_bool_setting(db, "allow_negative_stock")
+
+    if kind == "sale" and not allow_negative:
         available = get_stock_balance(db, payload.product_id, payload.location)
         if available < payload.net_weight_grams:
             raise HTTPException(
@@ -97,6 +125,7 @@ def create_transaction(
         reference=reference,
         kind=kind,
         product_id=payload.product_id,
+        party_id=party_id,
         quantity_grams=payload.quantity_grams,
         gross_weight_grams=payload.gross_weight_grams,
         net_weight_grams=payload.net_weight_grams,
@@ -107,7 +136,7 @@ def create_transaction(
         charges=payload.charges,
         total_amount=total,
         amount_paid=payload.amount_paid,
-        party_name=payload.party_name,
+        party_name=party_name,
         location=payload.location,
         destination=None,
         notes=payload.notes,
@@ -142,6 +171,18 @@ def create_transaction(
                 )
             )
 
+        log_audit(
+            db,
+            username=payload.created_by,
+            action=f"{kind}.create",
+            entity_type="transaction",
+            entity_id=transaction.id,
+            detail=(
+                f"{reference}; {payload.net_weight_grams}g; "
+                f"total {total}; party {party_name or 'n/a'}"
+            ),
+        )
+
         db.commit()
         db.refresh(transaction)
         return transaction
@@ -153,12 +194,17 @@ def create_transaction(
 def list_transactions(
     db: Session,
     kind: str | None = None,
+    include_cancelled: bool = False,
 ) -> list[Transaction]:
-    statement = select(Transaction).order_by(Transaction.created_at.desc())
+    statement = select(Transaction)
 
     if kind is not None:
         if kind not in {"purchase", "sale"}:
             raise HTTPException(status_code=422, detail="Invalid transaction type")
         statement = statement.where(Transaction.kind == kind)
 
+    if not include_cancelled:
+        statement = statement.where(Transaction.status == "active")
+
+    statement = statement.order_by(Transaction.created_at.desc())
     return list(db.scalars(statement).all())
