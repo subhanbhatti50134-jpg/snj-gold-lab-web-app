@@ -36,7 +36,8 @@ backend and **React + TypeScript + Vite** on the frontend.
   login. Role changes are audit-logged.
 - **Audit log** — every important action records who did what (admin only).
 - **Settings & backups** — business name, currency, default location,
-  negative-stock switch; `pg_dump` backups with a guarded restore.
+  negative-stock switch; pg_dump backups plus portable JSON
+  backup/restore with a guarded confirm step.
 
 ## Requirements
 
@@ -186,13 +187,22 @@ docker compose up --build -d
 
 ## 6. Backup & restore
 
-- Admin only: **Settings → Database backups → Create backup**
-- Files are written to `~/hisabpro/backups` (override with
-  `HISABPRO_BACKUP_DIR`) using `pg_dump --format=custom`.
-- Restoring requires typing the exact backup filename and **overwrites the
-  current database**.
+Two backup formats, both admin-only (**Settings → Database backups**):
 
-CLI equivalent:
+- **pg_dump backup** (`Create backup`) — full PostgreSQL dump
+  (`pg_dump --format=custom`). Restores the entire database.
+- **JSON backup** (`Create JSON backup`) — portable export of every
+  business table (users, settings, products, parties, rates,
+  transactions, payments, stock movements) as a single readable JSON
+  file. Restoring it **replaces all business data** with the file's
+  contents in one transaction (the audit log is kept). JSON files can
+  also be **downloaded** from the server for safekeeping elsewhere.
+
+Both restore flows require typing the exact backup filename to confirm
+and are written to the audit log. Files are stored in
+`~/hisabpro/backups` (override with `HISABPRO_BACKUP_DIR`).
+
+CLI equivalent for pg_dump:
 
 ```bash
 pg_dump -Fc -h 127.0.0.1 -U hisabpro -d hisabpro -f backups/my-backup.dump

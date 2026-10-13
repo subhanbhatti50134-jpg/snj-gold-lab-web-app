@@ -102,6 +102,7 @@ export interface AppSettings {
 export interface BackupInfo {
   filename: string;
   size_bytes: number;
+  kind: "pgdump" | "json";
   created_at: string;
 }
 

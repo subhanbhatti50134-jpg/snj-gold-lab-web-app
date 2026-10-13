@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.core.permissions import ADMIN_ROLES, require_roles
@@ -20,13 +22,20 @@ class RestoreRequest(BaseModel):
 class BackupOut(BaseModel):
     filename: str
     size_bytes: int
+    kind: Literal["pgdump", "json"] = "pgdump"
     created_at: datetime
+
+
+class JsonBackupOut(BackupOut):
+    kind: Literal["json"] = "json"
+    counts: dict[str, int] | None = None
 
 
 class RestoreOut(BaseModel):
     filename: str
     restored: bool
     restored_at: datetime
+    counts: dict[str, int] | None = None
 
 
 @router.get(
@@ -86,6 +95,77 @@ def restore_backup(
         entity_type="database",
         entity_id=filename,
         detail="database restored from backup",
+    )
+    db.commit()
+
+    return result
+
+
+@router.post(
+    "/json",
+    response_model=JsonBackupOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_json_backup(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    """Export all business data to a portable JSON backup file."""
+    result = backup_service.create_json_backup(db)
+
+    log_audit(
+        db,
+        username=user.username,
+        action="backup.create.json",
+        entity_type="database",
+        entity_id=result["filename"],
+        detail="JSON data backup created",
+    )
+    db.commit()
+
+    return result
+
+
+@router.get(
+    "/json/{filename}/download",
+    dependencies=[Depends(require_roles(*ADMIN_ROLES))],
+)
+def download_json_backup(filename: str):
+    """Download a JSON backup file so it can be stored off the server."""
+    path = backup_service._safe_json_path(filename)
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=path.name,
+    )
+
+
+@router.post(
+    "/json/{filename}/restore",
+    response_model=RestoreOut,
+)
+def restore_json_backup(
+    filename: str,
+    payload: RestoreRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    """Replace all business data with the contents of a JSON backup.
+
+    The restore only runs when `confirm` exactly matches the file name,
+    and every restore is written to the audit log afterwards.
+    """
+    result = backup_service.restore_json_backup(
+        db, filename, payload.confirm
+    )
+
+    log_audit(
+        db,
+        username=user.username,
+        action="backup.restore.json",
+        entity_type="database",
+        entity_id=filename,
+        detail="data restored from JSON backup",
     )
     db.commit()
 

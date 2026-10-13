@@ -25,6 +25,8 @@ os.environ["HISABPRO_API_KEY"] = "test-api-key"
 os.environ["JWT_SECRET_KEY"] = "test-only-jwt-secret-key-not-for-production"
 # Keep the shared in-memory login limiter out of the test suite.
 os.environ["HISABPRO_LOGIN_RATE_LIMIT"] = "0"
+# Keep test backups out of the real backup folder.
+os.environ["HISABPRO_BACKUP_DIR"] = "/tmp/hisabpro-test-backups"
 
 import pytest
 from fastapi.testclient import TestClient

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, atLeast, type CurrentUser } from "../api";
+import { API_BASE, api, atLeast, getToken, type CurrentUser } from "../api";
 import type {AppSettings, BackupInfo} from "../types";
 import { Empty, Field, Modal, PanelHeading } from "../ui";
 
@@ -27,7 +27,11 @@ export default function SettingsPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
-  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
+  const [creatingJsonBackup, setCreatingJsonBackup] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<{
+    filename: string;
+    kind: "pgdump" | "json";
+  } | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
   const isAdmin = atLeast(user, "admin");
@@ -96,17 +100,61 @@ export default function SettingsPage({
     }
   }
 
+  async function createJsonBackup() {
+    setCreatingJsonBackup(true);
+
+    try {
+      const created = await api<BackupInfo>("/api/backups/json", {
+        method: "POST"
+      });
+      notice(`JSON backup ban gaya: ${created.filename}`);
+      const rows = await api<BackupInfo[]>("/api/backups");
+      setBackups(rows);
+    } catch (error) {
+      fail(error);
+    } finally {
+      setCreatingJsonBackup(false);
+    }
+  }
+
+  async function downloadJsonBackup(filename: string) {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/backups/json/${encodeURIComponent(filename)}/download`,
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`
+          }
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Download failed: HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      fail(error);
+    }
+  }
+
   async function restore() {
     if (!restoreTarget) return;
 
+    const base =
+      restoreTarget.kind === "json"
+        ? `/api/backups/json/${encodeURIComponent(restoreTarget.filename)}`
+        : `/api/backups/${encodeURIComponent(restoreTarget.filename)}`;
+
     try {
-      const result = await api<RestoreResult>(
-        `/api/backups/${encodeURIComponent(restoreTarget)}/restore`,
-        {
-          method: "POST",
-          body: JSON.stringify({ confirm: confirmText })
-        }
-      );
+      const result = await api<RestoreResult>(`${base}/restore`, {
+        method: "POST",
+        body: JSON.stringify({ confirm: confirmText })
+      });
       notice(
         result.restored
           ? `Restore complete: ${result.filename}`
@@ -189,16 +237,25 @@ export default function SettingsPage({
       <section className="panel">
         <PanelHeading
           title="Database backups"
-          subtitle="pg_dump files stored on the server (admin only)"
+          subtitle="pg_dump files (full database) and JSON files (portable data), stored on the server (admin only)"
           action={
             isAdmin ? (
-              <button
-                className="primary-button"
-                onClick={() => void createBackup()}
-                disabled={creatingBackup}
-              >
-                {creatingBackup ? "Creating…" : "Create backup"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  className="primary-button"
+                  onClick={() => void createBackup()}
+                  disabled={creatingBackup}
+                >
+                  {creatingBackup ? "Creating…" : "Create backup"}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => void createJsonBackup()}
+                  disabled={creatingJsonBackup}
+                >
+                  {creatingJsonBackup ? "Creating…" : "Create JSON backup"}
+                </button>
+              </div>
             ) : null
           }
         />
@@ -208,6 +265,7 @@ export default function SettingsPage({
             <thead>
               <tr>
                 <th>File</th>
+                <th>Type</th>
                 <th>Size</th>
                 <th>Created</th>
                 {isAdmin && <th></th>}
@@ -219,14 +277,26 @@ export default function SettingsPage({
                   <td>
                     <b>{b.filename}</b>
                   </td>
+                  <td>{b.kind === "json" ? "JSON data" : "pg_dump"}</td>
                   <td>{(b.size_bytes / 1024 / 1024).toFixed(2)} MB</td>
                   <td>{new Date(b.created_at).toLocaleString()}</td>
                   {isAdmin && (
-                    <td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {b.kind === "json" && (
+                        <button
+                          className="text-button"
+                          onClick={() => void downloadJsonBackup(b.filename)}
+                        >
+                          Download
+                        </button>
+                      )}{" "}
                       <button
                         className="text-button danger"
                         onClick={() => {
-                          setRestoreTarget(b.filename);
+                          setRestoreTarget({
+                            filename: b.filename,
+                            kind: b.kind
+                          });
                           setConfirmText("");
                         }}
                       >
@@ -251,13 +321,13 @@ export default function SettingsPage({
 
       {restoreTarget && (
         <Modal
-          title={`Restore ${restoreTarget}`}
-          subtitle="This OVERWRITES the current database. This cannot be undone."
+          title={`Restore ${restoreTarget.filename}`}
+          subtitle="This OVERWRITES the current data. This cannot be undone."
           onClose={() => setRestoreTarget(null)}
         >
           <p className="hint">
             Type the exact filename to confirm:
-            <b> {restoreTarget}</b>
+            <b> {restoreTarget.filename}</b>
           </p>
           <form
             className="form-grid modal-form"
@@ -284,9 +354,11 @@ export default function SettingsPage({
               <button
                 type="submit"
                 className="primary-button"
-                disabled={confirmText !== restoreTarget}
+                disabled={confirmText !== restoreTarget.filename}
               >
-                Restore database
+                {restoreTarget.kind === "json"
+                  ? "Restore data"
+                  : "Restore database"}
               </button>
             </div>
           </form>
