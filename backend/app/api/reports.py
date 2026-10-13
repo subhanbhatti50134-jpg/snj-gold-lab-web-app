@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,14 +19,11 @@ ZERO = Decimal("0.00")
 
 
 def apply_date_filter(query, column, date_from, date_to):
+    """Filter on a plain-date column (transaction_date) inclusively."""
     if date_from is not None:
-        query = query.filter(
-            column >= datetime.combine(date_from, time.min)
-        )
+        query = query.filter(column >= date_from)
     if date_to is not None:
-        query = query.filter(
-            column < datetime.combine(date_to + timedelta(days=1), time.min)
-        )
+        query = query.filter(column <= date_to)
     return query
 
 
@@ -61,7 +58,7 @@ def financial_summary(
         )
 
         query = apply_date_filter(
-            query, Transaction.created_at, date_from, date_to
+            query, Transaction.transaction_date, date_from, date_to
         )
 
         total, paid = query.one()
@@ -121,11 +118,11 @@ def outstanding_report(
         )
 
     query = apply_date_filter(
-        query, Transaction.created_at, date_from, date_to
+        query, Transaction.transaction_date, date_from, date_to
     )
 
     rows = (
-        query.order_by(Transaction.created_at.desc(), Transaction.id.desc())
+        query.order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -174,11 +171,11 @@ def party_ledger(
     )
 
     query = apply_date_filter(
-        query, Transaction.created_at, date_from, date_to
+        query, Transaction.transaction_date, date_from, date_to
     )
 
     transactions = query.order_by(
-        Transaction.created_at.asc(), Transaction.id.asc()
+        Transaction.transaction_date.asc(), Transaction.id.asc()
     ).all()
 
     ledger = []
@@ -218,4 +215,51 @@ def party_ledger(
         "party_name": party_name.strip(),
         "transactions": ledger,
         "transaction_count": len(ledger),
+    }
+
+
+@router.get(
+    "/profit",
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
+def profit_estimate(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Best-effort profit estimate from recorded purchase and sale totals.
+
+    This is a simple sales-minus-purchases figure, NOT a precise
+    cost-of-goods-sold calculation. It is labelled an estimate everywhere
+    it is shown.
+    """
+    validate_dates(date_from, date_to)
+
+    def total_for(kind: str) -> Decimal:
+        query = db.query(
+            func.coalesce(func.sum(Transaction.total_amount), 0)
+        ).filter(
+            Transaction.kind == kind,
+            Transaction.status == "active",
+        )
+        query = apply_date_filter(
+            query, Transaction.transaction_date, date_from, date_to
+        )
+        return Decimal(str(query.scalar()))
+
+    sales = total_for("sale")
+    purchases = total_for("purchase")
+    returns_value = total_for("sales_return")
+    estimated = sales - returns_value - purchases
+
+    return {
+        "sales_total": sales,
+        "purchases_total": purchases,
+        "sales_returns_value": returns_value,
+        "estimated_profit": estimated,
+        "is_estimate": True,
+        "note": (
+            "Best-effort estimate: sales minus returns minus purchases. "
+            "Not a precise cost-of-goods-sold calculation."
+        ),
     }

@@ -27,7 +27,8 @@ const blank = (location: string) => ({
   amount_paid: "0",
   payment_method: "cash",
   location,
-  notes: ""
+  notes: "",
+  transaction_date: new Date().toISOString().slice(0, 10)
 });
 
 export default function PurchaseSalePage({
@@ -159,7 +160,8 @@ export default function PurchaseSalePage({
       amount_paid: Number(form.amount_paid || 0),
       payment_method: form.payment_method,
       location: form.location,
-      notes: form.notes
+      notes: form.notes,
+      transaction_date: form.transaction_date
     };
 
     if (form.party_id) payload.party_id = Number(form.party_id);
@@ -382,6 +384,17 @@ export default function PurchaseSalePage({
             <option value="bank_transfer">Bank transfer</option>
             <option value="other">Other</option>
           </select>
+        </Field>
+
+        <Field label="Transaction date">
+          <input
+            required
+            type="date"
+            value={form.transaction_date}
+            onChange={e =>
+              setForm({ ...form, transaction_date: e.target.value })
+            }
+          />
         </Field>
 
         <Field label="Stock location">

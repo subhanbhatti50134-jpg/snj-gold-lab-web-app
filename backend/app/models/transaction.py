@@ -1,9 +1,9 @@
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import (
-    DateTime, ForeignKey, Index, Numeric, String, Text
+    Date, DateTime, ForeignKey, Index, Numeric, String, Text
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -71,4 +71,9 @@ class Transaction(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, index=True
+    )
+    # The business date the user chose; reports filter on this, not on
+    # the row-creation timestamp.
+    transaction_date: Mapped[date] = mapped_column(
+        Date, default=date.today, index=True
     )

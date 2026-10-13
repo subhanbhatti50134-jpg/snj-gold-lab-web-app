@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -36,6 +36,8 @@ class TransactionCreate(BaseModel):
     destination: str | None = Field(default=None, max_length=100)
     notes: str = Field(default="", max_length=2000)
     created_by: str = Field(default="", max_length=120)
+    # Business date of the transaction; defaults to today server-side.
+    transaction_date: date | None = Field(default=None)
 
     @model_validator(mode="after")
     def validate_weights(self):
@@ -72,5 +74,6 @@ class TransactionOut(BaseModel):
     cancelled_by: str | None = None
     cancel_reason: str | None = None
     created_at: datetime | None = None
+    transaction_date: date | None = None
 
     model_config = ConfigDict(from_attributes=True)

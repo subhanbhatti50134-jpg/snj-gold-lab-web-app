@@ -140,6 +140,7 @@ def get_dashboard(db: Session) -> dict:
                 "quantity_grams": tx.quantity_grams,
                 "total_amount": tx.total_amount,
                 "amount_paid": tx.amount_paid,
+                "transaction_date": tx.transaction_date,
                 "created_at": tx.created_at,
             }
             for tx in recent

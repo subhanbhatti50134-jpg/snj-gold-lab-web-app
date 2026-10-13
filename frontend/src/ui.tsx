@@ -162,6 +162,7 @@ export function TransactionTable({
     quantity_grams: number | string;
     total_amount: number | string;
     amount_paid: number | string;
+    transaction_date?: string | null;
   }[];
   productMap: Map<number, Product>;
   showDue?: boolean;
@@ -174,6 +175,7 @@ export function TransactionTable({
         <thead>
           <tr>
             <th>Reference</th>
+            <th>Date</th>
             <th>Type</th>
             <th>Party</th>
             <th>Product</th>
@@ -189,6 +191,7 @@ export function TransactionTable({
           {transactions.map(t => (
             <tr key={t.id}>
               <td>{t.reference || `TX-${t.id}`}</td>
+              <td>{t.transaction_date || "—"}</td>
               <td>
                 <span className={`kind ${t.kind}`}>{pretty(t.kind)}</span>
               </td>

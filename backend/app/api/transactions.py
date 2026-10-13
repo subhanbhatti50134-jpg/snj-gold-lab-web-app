@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -75,15 +75,11 @@ def get_transactions(
 
     if date_from is not None:
         query = query.filter(
-            Transaction.created_at >= datetime.combine(date_from, time.min)
+            Transaction.transaction_date >= date_from
         )
 
     if date_to is not None:
-        query = query.filter(
-            Transaction.created_at < datetime.combine(
-                date_to + timedelta(days=1), time.min
-            )
-        )
+        query = query.filter(Transaction.transaction_date <= date_to)
 
     return (
         query.order_by(Transaction.created_at.desc(), Transaction.id.desc())

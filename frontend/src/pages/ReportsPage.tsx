@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, money, qty, type CurrentUser } from "../api";
-import type {CashflowReport, OutstandingItem, ReportSummary} from "../types";
+import type {CashflowReport, OutstandingItem, ProfitEstimate, ReportSummary} from "../types";
 import { Empty, Metric, PanelHeading, pretty } from "../ui";
 
 interface OutstandingResponse {
@@ -42,6 +42,7 @@ export default function ReportsPage({
   refreshKey: number;
 }) {
   const [summary, setSummary] = useState<ReportSummary | null>(null);
+  const [profit, setProfit] = useState<ProfitEstimate | null>(null);
   const [outstanding, setOutstanding] = useState<OutstandingResponse | null>(
     null
   );
@@ -60,13 +61,16 @@ export default function ReportsPage({
 
     Promise.allSettled([
       api<ReportSummary>("/api/reports/summary"),
+      api<ProfitEstimate>("/api/reports/profit"),
       api<OutstandingResponse>(`/api/reports/outstanding?${params}`),
       api<CashflowReport>("/api/reports/cashflow")
     ])
-      .then(([sum, out, cash]) => {
+      .then(([sum, prof, out, cash]) => {
         if (cancelled) return;
         if (sum.status === "fulfilled") setSummary(sum.value);
         else fail(sum.reason);
+        if (prof.status === "fulfilled") setProfit(prof.value);
+        else fail(prof.reason);
         if (out.status === "fulfilled") setOutstanding(out.value);
         else fail(out.reason);
         if (cash.status === "fulfilled") setCashflow(cash.value);
@@ -132,6 +136,14 @@ export default function ReportsPage({
           foot={`Received ${money(cashflow?.money_received)} · paid ${money(
             cashflow?.money_paid
           )} · ${cashflow?.payment_count ?? 0} payments`}
+        />
+        <Metric
+          icon={<span>📊</span>}
+          label="Est. profit"
+          value={money(profit?.estimated_profit)}
+          foot={`Sales ${money(profit?.sales_total)} · returns ${money(
+            profit?.sales_returns_value
+          )} · purchases ${money(profit?.purchases_total)} (estimate only)`}
         />
       </section>
 

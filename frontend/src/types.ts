@@ -55,6 +55,7 @@ export interface Transaction {
   cancelled_by?: string | null;
   cancel_reason?: string | null;
   created_at?: string | null;
+  transaction_date?: string | null;
 }
 
 export interface Payment {
@@ -142,6 +143,7 @@ export interface DashboardData {
     quantity_grams: number | string;
     total_amount: number | string;
     amount_paid: number | string;
+    transaction_date: string | null;
     created_at: string;
   }[];
 }
@@ -159,6 +161,15 @@ export interface ReportSummary {
   };
   sales_returns: { count: number };
   stock_adjustments: { count: number };
+}
+
+export interface ProfitEstimate {
+  sales_total: number | string;
+  purchases_total: number | string;
+  sales_returns_value: number | string;
+  estimated_profit: number | string;
+  is_estimate: boolean;
+  note: string;
 }
 
 export interface OutstandingItem {

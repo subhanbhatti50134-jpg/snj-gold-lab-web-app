@@ -25,8 +25,13 @@ backend and **React + TypeScript + Vite** on the frontend.
   backend posts compensating stock movements, optionally a refund payment,
   and an audit entry. Cancelled rows stay in the ledger but are excluded
   from reports.
-- **Reports** — financial summary, outstanding amounts, party ledger and
-  cashflow (money received / paid / net).
+- **Reports** — financial summary, outstanding amounts, party ledger,
+  cashflow (money received / paid / net), and a best-effort profit
+  estimate (sales minus returns minus purchases — clearly labelled as
+  an estimate, not a precise cost-of-goods-sold calculation).
+- **Transaction dates** — every purchase/sale carries an editable
+  `transaction_date` (defaults to today); date filters on lists and
+  reports use this business date, not the row-creation timestamp.
 - **Users & roles** — `admin`, `manager`, `operator`, `viewer` with JWT
   login. Role changes are audit-logged.
 - **Audit log** — every important action records who did what (admin only).
@@ -141,10 +146,11 @@ Backend against PostgreSQL (uses an isolated `hisabpro_test` schema):
 HISABPRO_PG_TESTS=1 .venv/bin/python -m pytest tests -q
 ```
 
-Frontend type-check / build:
+Frontend unit tests (vitest) and type-check / build:
 
 ```bash
 cd frontend
+npm test
 npm run build
 ```
 
@@ -159,13 +165,14 @@ cd frontend && npm run build && cd ../backend
 .venv/bin/python scripts/e2e_browser.py
 ```
 
-CI runs the SQLite tests, the PostgreSQL integration tests and the
-frontend build on every push (`.github/workflows/ci.yml`).
+CI runs the SQLite tests, the PostgreSQL integration tests, the frontend
+unit tests and the frontend build on every push
+(`.github/workflows/ci.yml`).
 
 ## 5. Docker (optional)
 
-With Docker installed, the whole stack runs with one command (values come
-from the project `.env` file):
+With Docker or Podman installed, the whole stack runs with one command
+(values come from the project `.env` file):
 
 ```bash
 docker compose up --build -d

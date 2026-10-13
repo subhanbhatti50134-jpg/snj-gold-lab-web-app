@@ -1,5 +1,5 @@
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -141,6 +141,7 @@ def create_transaction(
         destination=None,
         notes=payload.notes,
         created_by=payload.created_by,
+        transaction_date=payload.transaction_date or date.today(),
     )
 
     try:
