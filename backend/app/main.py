@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="HisabPro API",
+    title="SNJ Gold Lab API",
     description="Gold and silver inventory management",
     version="1.0.0",
     lifespan=lifespan,
@@ -82,4 +82,4 @@ app.include_router(dashboard_router)
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "application": "HisabPro"}
+    return {"status": "ok", "application": "SNJ Gold Lab"}

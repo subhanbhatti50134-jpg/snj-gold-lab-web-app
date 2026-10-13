@@ -8,7 +8,7 @@ from app.services.audit import log_audit
 # Known settings and their defaults. Unknown keys are rejected so a typo
 # cannot silently create a setting nobody reads.
 DEFAULTS: dict[str, str] = {
-    "business_name": "HisabPro Business",
+    "business_name": "SNJ Gold Lab",
     "currency": "PKR",
     "default_location": "Main Store",
     "allow_negative_stock": "false",

@@ -1,4 +1,4 @@
-# HisabPro
+# SNJ Gold Lab
 
 Inventory and transaction management for gold, silver, jewellery, biscuit and
 laboratory materials. Built with **FastAPI + SQLAlchemy + PostgreSQL** on the

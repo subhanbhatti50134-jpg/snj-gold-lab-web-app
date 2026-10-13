@@ -176,7 +176,7 @@ export default function App() {
         <section className="modal" style={{ width: "min(100%, 420px)" }}>
           <div className="modal-heading">
             <div>
-              <h2>HisabPro</h2>
+              <h2>SNJ Gold Lab</h2>
               <p>Sign in with your account to continue.</p>
             </div>
             <ShieldCheck size={20} color="#b08a42" />
@@ -229,7 +229,7 @@ export default function App() {
             <Coins size={18} />
           </div>
           <div>
-            <b>HisabPro</b>
+            <b>SNJ Gold Lab</b>
             <small>INVENTORY & TRANSACTIONS</small>
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function App() {
       <main className="main">
         <header className="topbar">
           <div className="breadcrumbs">
-            HisabPro <span>/</span> <b>{page}</b>
+            SNJ Gold Lab <span>/</span> <b>{page}</b>
           </div>
           <div className="top-actions">
             <span className="date-label">
@@ -339,7 +339,7 @@ export default function App() {
           />
 
           <footer className="footer">
-            <span>HisabPro · Inventory & Transactions</span>
+            <span>SNJ Gold Lab · Inventory & Transactions</span>
             <span>FastAPI backend · PostgreSQL · JWT auth</span>
           </footer>
         </div>
