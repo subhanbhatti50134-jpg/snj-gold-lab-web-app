@@ -31,7 +31,9 @@ backend and **React + TypeScript + Vite** on the frontend.
 - **Reports** — financial summary, outstanding amounts, party ledger,
   cashflow (money received / paid / net), and a best-effort profit
   estimate (sales minus returns minus purchases — clearly labelled as
-  an estimate, not a precise cost-of-goods-sold calculation).
+  an estimate, not a precise cost-of-goods-sold calculation). Reports
+  can be filtered by date range and printed or saved as PDF via the
+  browser's print dialog.
 - **Transaction dates** — every purchase/sale carries an editable
   `transaction_date` (defaults to today); date filters on lists and
   reports use this business date, not the row-creation timestamp.

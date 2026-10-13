@@ -231,3 +231,91 @@ tbody tr:hover { background: #fcfdff; }
 .kind.stock_transfer { background: #eaf1fd; color: #4a6fa5; }
 .kind.received { background: #e7f5ef; color: #348a70; }
 .kind.paid { background: #fdeeea; color: #c05640; }
+
+/* ---- Print / Save as PDF (browser print dialog) ---- */
+
+.print-header {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .sidebar,
+  .topbar,
+  .footer,
+  .print-hidden,
+  .alert,
+  button {
+    display: none !important;
+  }
+
+  .main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .content {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .print-header {
+    display: block;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #142438;
+  }
+
+  .print-header h1 {
+    margin: 0 0 2px;
+    font-size: 20px;
+    color: #142438;
+  }
+
+  .print-header h2 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #526176;
+  }
+
+  .print-header p {
+    margin: 0;
+    font-size: 11px;
+    color: #526176;
+  }
+
+  .panel,
+  .metric-card {
+    box-shadow: none !important;
+    border: 1px solid #d7dee8 !important;
+    break-inside: avoid;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  table {
+    font-size: 11px;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  h3 {
+    break-after: avoid;
+  }
+}

@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { api, money, qty, type CurrentUser } from "../api";
-import type {CashflowReport, OutstandingItem, ProfitEstimate, ReportSummary} from "../types";
-import { Empty, Metric, PanelHeading, pretty } from "../ui";
+import type {
+  AppSettings,
+  CashflowReport,
+  OutstandingItem,
+  ProfitEstimate,
+  ReportSummary
+} from "../types";
+import { Empty, Field, Metric, PanelHeading, pretty } from "../ui";
 
 interface OutstandingResponse {
   items: OutstandingItem[];
@@ -48,8 +54,11 @@ export default function ReportsPage({
   );
   const [cashflow, setCashflow] = useState<CashflowReport | null>(null);
   const [ledger, setLedger] = useState<LedgerResponse | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [partyName, setPartyName] = useState("");
   const [outstandingKind, setOutstandingKind] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
@@ -59,14 +68,22 @@ export default function ReportsPage({
     const params = new URLSearchParams({ limit: "200" });
     if (outstandingKind) params.set("kind", outstandingKind);
 
+    const range = new URLSearchParams();
+    if (dateFrom) range.set("date_from", dateFrom);
+    if (dateTo) range.set("date_to", dateTo);
+    const rangeQuery = range.toString() ? `?${range}` : "";
+
     Promise.allSettled([
-      api<ReportSummary>("/api/reports/summary"),
-      api<ProfitEstimate>("/api/reports/profit"),
+      api<AppSettings>("/api/settings"),
+      api<ReportSummary>(`/api/reports/summary${rangeQuery}`),
+      api<ProfitEstimate>(`/api/reports/profit${rangeQuery}`),
       api<OutstandingResponse>(`/api/reports/outstanding?${params}`),
-      api<CashflowReport>("/api/reports/cashflow")
+      api<CashflowReport>(`/api/reports/cashflow${rangeQuery}`)
     ])
-      .then(([sum, prof, out, cash]) => {
+      .then(([set, sum, prof, out, cash]) => {
         if (cancelled) return;
+        if (set.status === "fulfilled") setSettings(set.value);
+        else fail(set.reason);
         if (sum.status === "fulfilled") setSummary(sum.value);
         else fail(sum.reason);
         if (prof.status === "fulfilled") setProfit(prof.value);
@@ -83,7 +100,7 @@ export default function ReportsPage({
     return () => {
       cancelled = true;
     };
-  }, [fail, outstandingKind, refreshKey]);
+  }, [dateFrom, dateTo, fail, outstandingKind, refreshKey]);
 
   async function loadLedger() {
     if (!partyName.trim()) return;
@@ -106,6 +123,63 @@ export default function ReportsPage({
 
   return (
     <>
+      <div className="print-header">
+        <h1>{settings?.business_name || "SNJ Gold Lab"}</h1>
+        <h2>Financial report</h2>
+        <p>
+          {dateFrom || dateTo
+            ? `Period: ${dateFrom || "beginning"} to ${dateTo || "today"}`
+            : "Period: all time"}{" "}
+          · Printed {new Date().toLocaleString()}
+        </p>
+      </div>
+
+      <section className="panel print-hidden">
+        <PanelHeading
+          title="Report options"
+          subtitle="Filter by date, then print or save as PDF"
+          action={
+            <button
+              className="primary-button"
+              onClick={() => window.print()}
+            >
+              Print / Save PDF
+            </button>
+          }
+        />
+        <div
+          className="form-grid"
+          style={{ gridTemplateColumns: "200px 200px auto", alignItems: "end" }}
+        >
+          <Field label="From date">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+            />
+          </Field>
+          <Field label="To date">
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+            />
+          </Field>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+            >
+              Clear dates
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="metrics">
         <Metric
           icon={<span>🛒</span>}
