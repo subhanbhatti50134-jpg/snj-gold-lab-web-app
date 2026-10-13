@@ -11,3 +11,37 @@ dist/
 *.tsbuildinfo
 backups/
 .vite/
+
+# Database dumps & backups (private data)
+*.dump
+*.sql
+*.sql.gz
+*.sqlite3
+*.db
+
+# Logs
+*.log
+nohup.out
+
+# Secrets & credentials (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Coverage / tooling caches
+.coverage
+htmlcov/
+coverage/
+.mypy_cache/
+.ruff_cache/
