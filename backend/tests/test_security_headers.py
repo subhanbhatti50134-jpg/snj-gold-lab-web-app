@@ -8,6 +8,11 @@ def test_security_headers_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "no-referrer"
+    # Ignored by browsers over HTTP; active once HTTPS is in front of the app.
+    assert (
+        response.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains"
+    )
 
 
 def test_api_responses_are_not_cached(client):

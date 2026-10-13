@@ -32,3 +32,14 @@ if not API_KEY:
 
 if not JWT_SECRET_KEY:
     raise RuntimeError("JWT_SECRET_KEY is missing from the project .env file")
+
+if len(JWT_SECRET_KEY) < 32:
+    raise RuntimeError(
+        "JWT_SECRET_KEY must be at least 32 characters. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+    )
+
+# Development convenience: create tables on startup when True.
+# Production (docker-compose sets this to false) must use Alembic
+# migrations only so the schema is always migration-controlled.
+AUTO_CREATE_TABLES = os.getenv("HISABPRO_AUTO_CREATE_TABLES", "true").lower() in {"1", "true", "yes"}

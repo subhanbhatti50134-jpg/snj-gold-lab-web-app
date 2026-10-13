@@ -31,6 +31,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       HISABPRO_BACKUP_DIR: /app/backups
+      # Alembic (run by the Dockerfile CMD) owns the schema in production.
+      HISABPRO_AUTO_CREATE_TABLES: "false"
     volumes:
       - hisabpro_backups:/app/backups
     ports:

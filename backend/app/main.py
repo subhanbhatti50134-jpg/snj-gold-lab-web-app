@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import CORS_ORIGINS
+from app.core.config import AUTO_CREATE_TABLES, CORS_ORIGINS
 from app.api.products import router as products_router
 from app.api.rates import router as rates_router
 from app.db.base import Base
@@ -29,8 +29,10 @@ import app.models  # noqa: F401 - registers all ORM models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Development convenience. Use Alembic migrations for production.
-    Base.metadata.create_all(bind=engine)
+    # Development convenience only. Production (HISABPRO_AUTO_CREATE_TABLES=false)
+    # relies exclusively on Alembic migrations run before startup.
+    if AUTO_CREATE_TABLES:
+        Base.metadata.create_all(bind=engine)
     yield
 
 
@@ -57,6 +59,11 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Browsers ignore this over plain HTTP; it takes effect once HTTPS
+    # is terminated in front of the app (Phase 15).
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
     if request.url.path.startswith("/api/"):
         response.headers.setdefault("Cache-Control", "no-store")
     return response
