@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   ShoppingBag,
+  Store,
   UserRoundCog,
   Users,
   Wallet
@@ -37,6 +38,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import RatesPage from "./pages/RatesPage";
 import InventoryPage from "./pages/InventoryPage";
+import POSPage from "./pages/POSPage";
 import PurchaseSalePage from "./pages/PurchaseSalePage";
 import TransactionsPage from "./pages/TransactionsPage";
 import PartiesPage from "./pages/PartiesPage";
@@ -49,6 +51,7 @@ import { Field, Modal } from "./ui";
 
 type Page =
   | "Dashboard"
+  | "POS"
   | "Products"
   | "Metal Rates"
   | "Inventory"
@@ -64,6 +67,7 @@ type Page =
 
 const NAV: { label: Page; icon: typeof LayoutDashboard; min: "viewer" | "operator" | "manager" | "admin" }[] = [
   { label: "Dashboard", icon: LayoutDashboard, min: "viewer" },
+  { label: "POS", icon: Store, min: "operator" },
   { label: "Products", icon: Package, min: "viewer" },
   { label: "Metal Rates", icon: Coins, min: "viewer" },
   { label: "Inventory", icon: Boxes, min: "viewer" },
@@ -396,6 +400,16 @@ function PageBody({
     case "Inventory":
       return (
         <InventoryPage user={user} fail={fail} refreshKey={refreshKey} />
+      );
+    case "POS":
+      return (
+        <POSPage
+          user={user}
+          fail={fail}
+          notice={notice}
+          refreshKey={refreshKey}
+          bump={bump}
+        />
       );
     case "Purchases":
       return (

@@ -11,6 +11,9 @@ backend and **React + TypeScript + Vite** on the frontend.
 - **Verified metal rates** — manually verified rates with full history
   (never overwritten). Rates can be entered per **gram, tola or kilogram**;
   the backend normalizes everything to a per-gram rate before calculating.
+- **Point of sale** — cashier screen with product search, live stock,
+  auto-filled rates, multi-item cart and cash-change calculation;
+  checkout records each line as its own sale, all-or-nothing.
 - **Purchases & sales** — gross weight, deduction, net weight, purity, rate,
   charges and initial payment. Totals are always calculated by the backend.
 - **Stock control** — movements per location (Main Store, Vault, …), oversell

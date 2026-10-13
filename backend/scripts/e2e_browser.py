@@ -152,6 +152,23 @@ def main() -> int:
             page.wait_for_selector("text=Outstanding amounts", timeout=10000)
             print("PASS reports page loads")
 
+            # --- POS checkout -------------------------------------------
+            page.get_by_role("button", name="POS").click()
+            page.wait_for_selector("text=Point of sale", timeout=10000)
+            page.get_by_placeholder("Type to find a product…").fill("GOLD-24K")
+            page.wait_for_selector("tr:has-text('GOLD-24K')", timeout=10000)
+            page.locator("tr", has_text="GOLD-24K").get_by_text(
+                "Add", exact=True
+            ).click()
+            page.wait_for_selector("text=Cart (1 items)", timeout=10000)
+            page.get_by_label("Cash received").fill("30000")
+            page.get_by_role(
+                "button", name=re.compile("Checkout")
+            ).click()
+            page.wait_for_selector("text=Sale complete", timeout=15000)
+            page.get_by_role("button", name="New sale").click()
+            print("PASS POS checkout completes with receipt modal")
+
             # --- Viewer role limits --------------------------------------
             page.get_by_role("button", name="Sign out").click()
             page.get_by_label("Username").fill("viewer")
@@ -162,7 +179,10 @@ def main() -> int:
             nav_names = page.locator(".nav-item span").all_inner_texts()
             assert "Stock Movements" not in nav_names, nav_names
             assert "Users" not in nav_names, nav_names
-            print("PASS viewer sees a reduced navigation (no movements/users)")
+            assert "POS" not in nav_names, nav_names
+            print(
+                "PASS viewer sees a reduced navigation (no pos/movements/users)"
+            )
 
             page.get_by_role("button", name="Products").click()
             page.wait_for_selector("text=Product catalogue", timeout=10000)

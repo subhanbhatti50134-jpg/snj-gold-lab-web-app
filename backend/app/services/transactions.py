@@ -39,6 +39,8 @@ def create_transaction(
     db: Session,
     payload: TransactionCreate,
     kind: str,
+    *,
+    commit: bool = True,
 ) -> Transaction:
     if kind not in {"purchase", "sale"}:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
@@ -184,8 +186,9 @@ def create_transaction(
             ),
         )
 
-        db.commit()
-        db.refresh(transaction)
+        if commit:
+            db.commit()
+            db.refresh(transaction)
         return transaction
     except Exception:
         db.rollback()

@@ -77,3 +77,9 @@ class TransactionOut(BaseModel):
     transaction_date: date | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SaleBatchCreate(BaseModel):
+    """POS checkout: several sales created in one atomic batch."""
+
+    items: list[TransactionCreate] = Field(min_length=1, max_length=50)
