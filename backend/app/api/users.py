@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +5,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.auth import get_current_user
 from app.core.auth import hash_password
 from app.core.permissions import require_roles
 from app.db.session import get_db
@@ -77,12 +75,12 @@ def create_user(
         )
         db.commit()
         db.refresh(user)
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username already exists",
-        )
+        ) from exc
 
     return user_data(user)
 
@@ -220,12 +218,12 @@ def update_user_username(
             detail=f"{old_username} -> {data.username}",
         )
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username already exists",
-        )
+        ) from exc
 
     db.refresh(user)
     return user_data(user)

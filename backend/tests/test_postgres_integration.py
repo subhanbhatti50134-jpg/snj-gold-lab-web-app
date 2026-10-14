@@ -12,16 +12,15 @@ Run them with:
 They are skipped unless HISABPRO_PG_TESTS=1 is set.
 """
 import os
-from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 
 import pytest
+from conftest import PG_DATABASE_URL
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-
-from conftest import PG_DATABASE_URL
 
 PG_ENABLED = os.getenv("HISABPRO_PG_TESTS") == "1"
 SCHEMA = "hisabpro_test"
@@ -53,8 +52,8 @@ def pg_engine():
 
 @pytest.fixture
 def pg_session_factory(pg_engine):
-    from app.db.base import Base
     import app.models  # noqa: F401
+    from app.db.base import Base
 
     Base.metadata.drop_all(bind=pg_engine)
     Base.metadata.create_all(bind=pg_engine)
@@ -516,8 +515,8 @@ def test_pg_constraints_reject_invalid_rows(pg_engine):
     This proves the guards are enforced by PostgreSQL itself, not only by
     the Pydantic schemas / service layer.
     """
-    from app.db.base import Base
     import app.models  # noqa: F401
+    from app.db.base import Base
 
     Base.metadata.drop_all(bind=pg_engine)
     Base.metadata.create_all(bind=pg_engine)

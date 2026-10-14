@@ -1,5 +1,5 @@
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
@@ -27,6 +27,6 @@ class Payment(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     paid_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     recorded_by: Mapped[str] = mapped_column(String(120))

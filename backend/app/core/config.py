@@ -58,13 +58,18 @@ if len(JWT_SECRET_KEY) < 32:
 
 if LOG_LEVEL not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
     raise RuntimeError(
-        f"HISABPRO_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL (got {LOG_LEVEL!r})"
+        "HISABPRO_LOG_LEVEL must be one of DEBUG, INFO, WARNING, "
+        f"ERROR, CRITICAL (got {LOG_LEVEL!r})"
     )
 
 # Development convenience: create tables on startup when True.
 # Production (docker-compose sets this to false) must use Alembic
 # migrations only so the schema is always migration-controlled.
-AUTO_CREATE_TABLES = os.getenv("HISABPRO_AUTO_CREATE_TABLES", "true").lower() in {"1", "true", "yes"}
+AUTO_CREATE_TABLES = os.getenv("HISABPRO_AUTO_CREATE_TABLES", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 if BACKUP_KEY:
     try:

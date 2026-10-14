@@ -120,7 +120,7 @@ export async function api<T>(
   }
 
   const text = await response.text();
-  let data: unknown = null;
+  let data: unknown;
 
   try {
     data = text ? JSON.parse(text) : null;

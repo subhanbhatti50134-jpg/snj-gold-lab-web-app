@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, money, newIdempotencyKey, type CurrentUser } from "../api";
 import type {MetalRate, Party, Product, RateUnit} from "../types";
-import { Empty, Field } from "../ui";
+import { Field } from "../ui";
 
 const GRAMS_PER_TOLA = 11.6638;
 
@@ -33,7 +33,7 @@ const blank = (location: string) => ({
 
 export default function PurchaseSalePage({
   kind,
-  user,
+  user: _user,
   fail,
   notice,
   refreshKey,

@@ -1,5 +1,4 @@
 
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -44,12 +43,12 @@ def create_product(
         )
         db.commit()
         db.refresh(product)
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A product with this SKU already exists",
-        )
+        ) from exc
 
     return product
 
@@ -129,12 +128,12 @@ def update_product(
             detail=", ".join(sorted(changes)),
         )
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A product with this SKU already exists",
-        )
+        ) from exc
 
     db.refresh(product)
     return product

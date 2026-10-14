@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import {
   ArrowDownLeft, ArrowUpRight, Boxes, Users, Wallet
 } from "lucide-react";
-import { api, errorText, money, qty, type CurrentUser } from "../api";
-import type {DashboardData, Product, Transaction} from "../types";
+import { api, money, qty, type CurrentUser } from "../api";
+import type {DashboardData, Product} from "../types";
 import { Empty, Metric, PanelHeading, TransactionTable } from "../ui";
 
 const GRAMS_PER_TOLA = 11.6638;

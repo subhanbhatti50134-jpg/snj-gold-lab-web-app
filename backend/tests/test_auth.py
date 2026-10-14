@@ -1,11 +1,7 @@
-from datetime import datetime, timedelta, timezone
 
-import jwt
 
 from app.core.auth import hash_password
-from app.core.config import JWT_SECRET_KEY
 from app.models.user import User
-from test_api import API_HEADERS
 
 
 def create_user(db, username="testuser", password="CorrectPass123", active=True):

@@ -4,8 +4,6 @@ import base64
 import json
 import os
 import time
-from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -264,7 +262,6 @@ def test_prune_never_deletes_below_keep_min(tmp_path, monkeypatch, retention):
 def test_create_json_backup_triggers_prune(
     encrypted_backup_dir, client: TestClient, db: Session, auth_headers, retention
 ):
-    from app.services import backup as backup_service
 
     admin = auth_headers("admin")
     retention(days=30, keep_min=5)

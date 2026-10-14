@@ -45,7 +45,6 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 
-
 TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
 
 test_engine = create_engine(

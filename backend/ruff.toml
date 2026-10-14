@@ -1,0 +1,16 @@
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    # FastAPI's Depends()/Form() in default arguments is the framework idiom.
+    "B008",
+]
+
+[lint.per-file-ignores]
+# Test files use loose fixtures and long assertion strings.
+"tests/*" = ["E501"]
+# conftest must set environment variables before importing the app.
+"tests/conftest.py" = ["E402"]

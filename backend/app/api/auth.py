@@ -38,8 +38,8 @@ def get_current_user(
     try:
         payload = decode_access_token(credentials.credentials)
         user_id = int(payload["sub"])
-    except (InvalidTokenError, ValueError, KeyError, TypeError):
-        raise unauthorized
+    except (InvalidTokenError, ValueError, KeyError, TypeError) as exc:
+        raise unauthorized from exc
 
     user = db.get(User, user_id)
 

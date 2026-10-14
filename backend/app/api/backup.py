@@ -1,16 +1,16 @@
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.core.permissions import ADMIN_ROLES, require_roles
-from app.services.audit import log_audit
 from app.db.session import get_db
 from app.models.user import User
 from app.services import backup as backup_service
-from sqlalchemy.orm import Session
+from app.services.audit import log_audit
 
 router = APIRouter(prefix="/api/backups", tags=["Database Backup"])
 

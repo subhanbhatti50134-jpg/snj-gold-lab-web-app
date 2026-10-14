@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.payments import PaymentCreate, PaymentOut
 from app.services import idempotency
-from app.services.payments import record_payment, list_payments
+from app.services.payments import list_payments, record_payment
 
 router = APIRouter(prefix="/api/transactions", tags=["Payments"])
 

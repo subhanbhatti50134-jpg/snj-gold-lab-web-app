@@ -7,30 +7,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+import app.models  # noqa: F401 - registers all ORM models
+from app.api.audit import router as audit_router
+from app.api.auth import router as auth_router
+from app.api.backup import router as backup_router
+from app.api.cashflow import router as cashflow_router
+from app.api.dashboard import router as dashboard_router
+from app.api.inventory import router as inventory_router
+from app.api.monitoring import router as monitoring_router
+from app.api.movements import router as movements_router
+from app.api.parties import router as parties_router
+from app.api.payments import router as payments_router
+from app.api.products import router as products_router
+from app.api.purchases import router as purchases_router
+from app.api.rates import router as rates_router
+from app.api.reports import router as reports_router
+from app.api.sales import router as sales_router
+from app.api.settings import router as settings_router
+from app.api.transactions import router as transactions_router
+from app.api.users import router as users_router
+from app.core import metrics
 from app.core.config import AUTO_CREATE_TABLES, CORS_ORIGINS
 from app.core.logging import configure_logging, get_logger
-from app.core import metrics
-from app.api.products import router as products_router
-from app.api.rates import router as rates_router
 from app.db.base import Base
-from app.db.session import engine, SessionLocal
-from app.api.purchases import router as purchases_router
-from app.api.sales import router as sales_router
-from app.api.inventory import router as inventory_router
-from app.api.transactions import router as transactions_router
-from app.api.payments import router as payments_router
-from app.api.movements import router as movements_router
-from app.api.reports import router as reports_router
-from app.api.cashflow import router as cashflow_router
-from app.api.auth import router as auth_router
-from app.api.users import router as users_router
-from app.api.parties import router as parties_router
-from app.api.audit import router as audit_router
-from app.api.settings import router as settings_router
-from app.api.backup import router as backup_router
-from app.api.dashboard import router as dashboard_router
-from app.api.monitoring import router as monitoring_router
-import app.models  # noqa: F401 - registers all ORM models
+from app.db.session import SessionLocal, engine
 
 configure_logging()
 logger = get_logger("hisabpro")

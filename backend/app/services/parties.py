@@ -26,12 +26,12 @@ def create_party(db: Session, payload: PartyCreate, username: str) -> Party:
             detail=party.name,
         )
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=409,
             detail="A party with this name already exists",
-        )
+        ) from exc
     except Exception:
         db.rollback()
         raise
@@ -66,12 +66,12 @@ def update_party(
             detail=", ".join(sorted(changes)) or "no field changes",
         )
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=409,
             detail="A party with this name already exists",
-        )
+        ) from exc
     except Exception:
         db.rollback()
         raise

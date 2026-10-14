@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import tempfile
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -15,16 +15,16 @@ from sqlalchemy import delete, inspect, select
 from sqlalchemy.orm import Session
 
 from app.core.config import (
-    BACKUP_KEY,
     BACKUP_KEEP_MIN,
+    BACKUP_KEY,
     BACKUP_RETENTION_DAYS,
     DATABASE_URL,
     ROOT_DIR,
 )
 from app.models.idempotency import IdempotencyKey
 from app.models.metal_rate import MetalRate
-from app.models.payments import Payment
 from app.models.party import Party
+from app.models.payments import Payment
 from app.models.product import Product
 from app.models.setting import Setting
 from app.models.stock_movement import StockMovement
@@ -180,7 +180,7 @@ def list_backups() -> list[dict]:
                 "kind": "json" if ".json" in path.name else "pgdump",
                 "encrypted": path.name.endswith(".enc"),
                 "created_at": datetime.fromtimestamp(
-                    stat.st_mtime, tz=timezone.utc
+                    stat.st_mtime, tz=UTC
                 ),
             }
         )
@@ -200,7 +200,7 @@ def prune_old_backups() -> list[str]:
     paths = [p for p in BACKUP_DIR.iterdir() if p.is_file()]
     paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
     cutoff = now - (BACKUP_RETENTION_DAYS * 86400)
 
     deleted: list[str] = []
@@ -223,7 +223,7 @@ def prune_old_backups() -> list[str]:
 def create_backup() -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
-    timestamp = f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
+    timestamp = f"{datetime.now(UTC):%Y%m%d-%H%M%S}"
     key = _backup_key()
     extension = ".dump.enc" if key else ".dump"
     filename = f"hisabpro-{timestamp}{extension}"
@@ -271,7 +271,7 @@ def create_backup() -> dict:
         "size_bytes": stat.st_size,
         "kind": "pgdump",
         "encrypted": key is not None,
-        "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+        "created_at": datetime.fromtimestamp(stat.st_mtime, tz=UTC),
         "pruned": pruned,
     }
 
@@ -332,7 +332,7 @@ def restore_backup(filename: str, confirm: str) -> dict:
     return {
         "filename": filename,
         "restored": True,
-        "restored_at": datetime.now(timezone.utc),
+        "restored_at": datetime.now(UTC),
     }
 
 
@@ -393,7 +393,7 @@ def create_json_backup(db: Session) -> dict:
     payload = {
         "format": JSON_FORMAT,
         "version": JSON_VERSION,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "counts": counts,
         "data": data,
     }
@@ -401,7 +401,7 @@ def create_json_backup(db: Session) -> dict:
     key = _backup_key()
     extension = ".json.enc" if key else ".json"
     filename = (
-        f"snj-gold-lab-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}{extension}"
+        f"snj-gold-lab-{datetime.now(UTC):%Y%m%d-%H%M%S}{extension}"
     )
     destination = BACKUP_DIR / filename
 
@@ -419,7 +419,7 @@ def create_json_backup(db: Session) -> dict:
         "size_bytes": stat.st_size,
         "kind": "json",
         "encrypted": key is not None,
-        "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+        "created_at": datetime.fromtimestamp(stat.st_mtime, tz=UTC),
         "counts": counts,
         "pruned": pruned,
     }
@@ -539,6 +539,6 @@ def restore_json_backup(db: Session, filename: str, confirm: str) -> dict:
     return {
         "filename": filename,
         "restored": True,
-        "restored_at": datetime.now(timezone.utc),
+        "restored_at": datetime.now(UTC),
         "counts": counts,
     }

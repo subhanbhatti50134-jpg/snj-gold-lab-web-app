@@ -178,7 +178,7 @@ def main() -> None:
                                 "0321-7654321")
 
         # Two purchases (stock in) with a partial payment on the first.
-        buy1 = create_transaction(
+        create_transaction(
             db,
             TransactionCreate(**tx_kwargs(
                 gold24,
@@ -276,7 +276,7 @@ def main() -> None:
         )
 
         print(f"\nDemo data ready at {datetime.now():%Y-%m-%d %H:%M}")
-        print(f"Products, rates, 2 parties, 3 purchases, 2 sales, 1 payment.")
+        print("Products, rates, 2 parties, 3 purchases, 2 sales, 1 payment.")
         print(f"\nDemo logins (password: {DEMO_PASSWORD}):")
         print("  manager / operator / viewer  (plus your admin account)")
 

@@ -142,7 +142,7 @@ def begin(
             )
         )
         db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         # Lost a concurrent race for the same key: drop our claim and
         # replay whatever the winner stored.
         db.rollback()
@@ -155,7 +155,7 @@ def begin(
                 detail=(
                     "Could not claim the Idempotency-Key. Please retry."
                 ),
-            )
+            ) from exc
         return _replay_from(winner, digest)
 
     return None

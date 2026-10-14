@@ -1,5 +1,6 @@
-from helpers import login_headers
 from decimal import Decimal
+
+from helpers import login_headers
 
 API_HEADERS = {"X-API-Key": "test-api-key"}
 

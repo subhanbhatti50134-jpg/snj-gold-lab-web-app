@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -132,7 +131,7 @@ def cancel_transaction(
             transaction.amount_paid = Decimal("0.00")
 
         transaction.status = "cancelled"
-        transaction.cancelled_at = datetime.now(timezone.utc)
+        transaction.cancelled_at = datetime.now(UTC)
         transaction.cancelled_by = username
         transaction.cancel_reason = reason
 

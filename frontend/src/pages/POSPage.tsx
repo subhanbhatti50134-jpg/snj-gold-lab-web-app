@@ -20,8 +20,6 @@ interface CheckoutResult {
   due: number;
 }
 
-let keyCounter = 0;
-
 export default function POSPage({
   user,
   fail,
@@ -58,6 +56,7 @@ export default function POSPage({
   // The same key is reused if a checkout fails and is retried, so the
   // server records the sale only once. Cleared after a success.
   const checkoutKeyRef = useRef("");
+  const keyCounterRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,11 +126,11 @@ export default function POSPage({
 
   function addProduct(product: Product) {
     const rate = defaultRate(rates, product.metal, product.purity);
-    keyCounter += 1;
+    keyCounterRef.current += 1;
     setCart([
       ...cart,
       {
-        key: `line-${keyCounter}`,
+        key: `line-${keyCounterRef.current}`,
         product_id: product.id,
         sku: product.sku,
         name: product.name,

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.config import (
     AUTO_CREATE_TABLES,
-    BACKUP_KEY,
     BACKUP_KEEP_MIN,
+    BACKUP_KEY,
     BACKUP_RETENTION_DAYS,
     DATABASE_URL,
     LOGIN_RATE_LIMIT,

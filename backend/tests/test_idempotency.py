@@ -1,6 +1,5 @@
 """Idempotency: a retried checkout or payment must not record twice."""
 
-from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session

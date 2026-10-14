@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.product import Product
-from app.models.transaction import Transaction
-from app.schemas.transaction import TransactionCreate
 
 
 def make_product(db: Session) -> Product:

@@ -47,7 +47,7 @@ import MovementsPage from "./pages/MovementsPage";
 import ReportsPage from "./pages/ReportsPage";
 import AuditPage from "./pages/AuditPage";
 import SettingsPage from "./pages/SettingsPage";
-import { Field, Modal } from "./ui";
+import { Field } from "./ui";
 
 type Page =
   | "Dashboard"

@@ -1,6 +1,5 @@
 
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import date
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -73,9 +72,15 @@ def create_transaction(
         if rate.metal != product.metal:
             raise HTTPException(status_code=422, detail="Rate metal does not match product")
         if rate.purity != payload.purity:
-            raise HTTPException(status_code=422, detail="Rate purity does not match transaction purity")
+            raise HTTPException(
+                status_code=422,
+                detail="Rate purity does not match transaction purity",
+            )
         if rate_per_gram is not None and rate_per_gram != rate.rate_per_gram:
-            raise HTTPException(status_code=422, detail="Rate conflicts with selected rate record")
+            raise HTTPException(
+                status_code=422,
+                detail="Rate conflicts with selected rate record",
+            )
         rate_per_gram = rate.rate_per_gram
 
     if rate_per_gram is None:

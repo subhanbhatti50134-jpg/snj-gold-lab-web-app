@@ -142,7 +142,6 @@ def test_password_reset_rejects_short_password(client, db):
 
 
 def test_password_change_requires_admin(client, db):
-    headers = admin_headers(client, db)
     operator = create_test_user(db, "justoperator", role="operator")
 
     login = client.post(
@@ -219,7 +218,6 @@ def test_admin_can_rename_self_and_session_survives(client, db):
 
 
 def test_rename_requires_admin(client, db):
-    headers = admin_headers(client, db)
     operator = create_test_user(db, "plainoperator", role="operator")
 
     login = client.post(

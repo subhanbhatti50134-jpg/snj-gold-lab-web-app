@@ -1,15 +1,15 @@
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Boolean, DateTime, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 
 def utc_now():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MetalRate(Base):
