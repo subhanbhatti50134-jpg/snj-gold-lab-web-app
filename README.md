@@ -4,6 +4,9 @@ Inventory and transaction management for gold, silver, jewellery, biscuit and
 laboratory materials. Built with **FastAPI + SQLAlchemy + PostgreSQL** on the
 backend and **React + TypeScript + Vite** on the frontend.
 
+Putting the system into real use? Follow **[LAUNCH.md](LAUNCH.md)** — the
+production launch checklist (secrets, first run, backups, HTTPS, sign-off).
+
 ## Features
 
 - **Products** — loose metal, biscuits, jewellery, lab materials with metal,
