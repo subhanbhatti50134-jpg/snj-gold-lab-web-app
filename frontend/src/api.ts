@@ -156,12 +156,31 @@ export async function api<T>(
   return data as T;
 }
 
+// Currency used by money(). Defaults to PKR until settings load.
+let activeCurrency = "PKR";
+
+export function setCurrency(code: string) {
+  if (code && code.trim()) {
+    activeCurrency = code.trim().toUpperCase();
+  }
+}
+
 export function money(value: unknown): string {
-  return new Intl.NumberFormat("en-PK", {
-    style: "currency",
-    currency: "PKR",
-    maximumFractionDigits: 2
-  }).format(Number(value || 0));
+  let formatter: Intl.NumberFormat;
+  try {
+    formatter = new Intl.NumberFormat("en-PK", {
+      style: "currency",
+      currency: activeCurrency,
+      maximumFractionDigits: 2
+    });
+  } catch {
+    // Unknown/invalid currency code from settings: fall back to plain
+    // grouping so the UI never crashes.
+    formatter = new Intl.NumberFormat("en-PK", {
+      maximumFractionDigits: 2
+    });
+  }
+  return formatter.format(Number(value || 0));
 }
 
 export function qty(value: unknown): string {

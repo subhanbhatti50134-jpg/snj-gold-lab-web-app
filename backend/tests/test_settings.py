@@ -28,6 +28,111 @@ def test_default_settings_are_returned(client):
     assert settings["currency"] == "PKR"
     assert settings["allow_negative_stock"] == "false"
     assert settings["default_location"] == "Main Store"
+    # Phase 15 additions are present with their defaults.
+    assert settings["business_phone"] == ""
+    assert settings["business_address"] == ""
+    assert settings["default_rate_unit"] == "tola"
+    assert settings["low_stock_threshold"] == "0"
+    assert settings["receipt_note"] == ""
+
+
+def test_new_profile_settings_round_trip(client):
+    response = update_settings(
+        client,
+        {
+            "business_phone": "+92 300 1234567",
+            "business_address": "Gold Market, Lahore",
+            "default_rate_unit": "gram",
+            "low_stock_threshold": "12.5",
+            "receipt_note": "Thank you for your business",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["business_phone"] == "+92 300 1234567"
+    assert body["business_address"] == "Gold Market, Lahore"
+    assert body["default_rate_unit"] == "gram"
+    assert body["low_stock_threshold"] == "12.5"
+    assert body["receipt_note"] == "Thank you for your business"
+
+
+def test_optional_profile_fields_may_be_cleared(client):
+    response = update_settings(
+        client,
+        {
+            "business_phone": "",
+            "business_address": "",
+            "receipt_note": "",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["business_phone"] == ""
+
+
+def test_invalid_rate_unit_is_rejected(client):
+    response = update_settings(client, {"default_rate_unit": "ounce"})
+    assert response.status_code == 422
+    assert "default_rate_unit" in response.json()["detail"]
+
+
+def test_invalid_low_stock_threshold_is_rejected(client):
+    assert (
+        update_settings(client, {"low_stock_threshold": "abc"}).status_code
+        == 422
+    )
+    assert (
+        update_settings(client, {"low_stock_threshold": "-5"}).status_code
+        == 422
+    )
+    assert (
+        update_settings(
+            client, {"low_stock_threshold": "2000000"}
+        ).status_code
+        == 422
+    )
+
+
+def test_empty_required_fields_still_rejected(client):
+    # Optional fields may be empty, required ones may not.
+    assert update_settings(client, {"business_name": ""}).status_code == 422
+    assert update_settings(client, {"default_location": ""}).status_code == 422
+    assert update_settings(client, {"currency": ""}).status_code == 422
+
+
+def test_system_info_requires_admin_and_hides_secrets(client, auth_headers):
+    # Viewer/manager cannot read system info.
+    assert (
+        client.get(
+            "/api/settings/system", headers=login_headers(client, "viewer")
+        ).status_code
+        == 403
+    )
+    assert (
+        client.get(
+            "/api/settings/system", headers=login_headers(client, "manager")
+        ).status_code
+        == 403
+    )
+
+    response = client.get(
+        "/api/settings/system", headers=login_headers(client, "admin")
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["app_version"]
+    # Tests always run against SQLite; production uses PostgreSQL.
+    assert body["database_backend"] == "sqlite" or body[
+        "database_backend"
+    ].startswith("postgres")
+    assert isinstance(body["backup_encrypted"], bool)
+    assert body["backup_retention_days"] >= 1
+    assert body["backup_keep_min"] >= 1
+
+    # No secrets may ever appear in this payload.
+    raw = response.text
+    assert "secret" not in raw.lower()
+    assert "HISABPRO_BACKUP_KEY" not in raw
+    assert "://" not in raw  # no database URL
 
 
 def test_admin_can_update_settings(client):

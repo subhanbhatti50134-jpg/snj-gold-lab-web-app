@@ -64,7 +64,9 @@ export default function PurchaseSalePage({
       api<Product[]>("/api/products?limit=1000"),
       api<Party[]>("/api/parties?include_inactive=false"),
       api<MetalRate[]>("/api/rates"),
-      api<{ default_location: string }>("/api/settings")
+      api<{ default_location: string; default_rate_unit: RateUnit }>(
+        "/api/settings"
+      )
     ])
       .then(([prods, pars, rt, settings]) => {
         if (cancelled) return;
@@ -75,7 +77,11 @@ export default function PurchaseSalePage({
         if (rt.status === "fulfilled") setRates(rt.value);
         else fail(rt.reason);
         if (settings.status === "fulfilled") {
-          setForm(f => ({ ...f, location: settings.value.default_location }));
+          setForm(f => ({
+            ...f,
+            location: settings.value.default_location,
+            rate_unit: settings.value.default_rate_unit || f.rate_unit
+          }));
         }
       })
       .finally(() => {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { API_BASE, api, atLeast, getToken, type CurrentUser } from "../api";
-import type {AppSettings, BackupInfo} from "../types";
+import type {AppSettings, BackupInfo, SystemInfo} from "../types";
 import { Empty, Field, Modal, PanelHeading } from "../ui";
 
 interface RestoreResult {
@@ -23,9 +23,10 @@ export default function SettingsPage({
   bump: () => void;
 }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingKeys, setSavingKeys] = useState<string[]>([]);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [creatingJsonBackup, setCreatingJsonBackup] = useState(false);
   const [restorePickerOpen, setRestorePickerOpen] = useState(false);
@@ -42,15 +43,19 @@ export default function SettingsPage({
 
     if (isAdmin) {
       tasks.push(api<BackupInfo[]>("/api/backups"));
+      tasks.push(api<SystemInfo>("/api/settings/system"));
     }
 
     Promise.allSettled(tasks)
-      .then(([set, bak]) => {
+      .then(([set, bak, sys]) => {
         if (cancelled) return;
         if (set.status === "fulfilled") setSettings(set.value as AppSettings);
         else fail(set.reason);
         if (bak && bak.status === "fulfilled") {
           setBackups(bak.value as BackupInfo[]);
+        }
+        if (sys && sys.status === "fulfilled") {
+          setSystemInfo(sys.value as SystemInfo);
         }
       })
       .finally(() => {
@@ -62,15 +67,25 @@ export default function SettingsPage({
     };
   }, [fail, isAdmin, refreshKey]);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  function patch(partial: Partial<AppSettings>) {
+    setSettings(prev => (prev ? { ...prev, ...partial } : prev));
+  }
+
+  // Save a specific group of keys. The backend accepts partial payloads,
+  // so each section only sends what it owns.
+  async function saveKeys(keys: string[]) {
     if (!settings) return;
-    setSaving(true);
+    const payload: Record<string, string> = {};
+    for (const key of keys) {
+      payload[key] = settings[key as keyof AppSettings];
+    }
+
+    setSavingKeys(keys);
 
     try {
       const updated = await api<AppSettings>("/api/settings", {
         method: "PUT",
-        body: JSON.stringify(settings)
+        body: JSON.stringify(payload)
       });
       setSettings(updated);
       notice("Settings save ho gayi.");
@@ -78,9 +93,13 @@ export default function SettingsPage({
     } catch (error) {
       fail(error);
     } finally {
-      setSaving(false);
+      setSavingKeys([]);
     }
   }
+
+  const isSaving = (keys: string[]) =>
+    keys.length > 0 && savingKeys.length > 0 &&
+    keys.every(k => savingKeys.includes(k));
 
   async function createBackup() {
     setCreatingBackup(true);
@@ -172,61 +191,70 @@ export default function SettingsPage({
     }
   }
 
+  const PROFILE_KEYS = [
+    "business_name",
+    "business_phone",
+    "business_address",
+    "currency"
+  ];
+  const INVENTORY_KEYS = [
+    "default_location",
+    "default_rate_unit",
+    "allow_negative_stock",
+    "low_stock_threshold"
+  ];
+  const REPORT_KEYS = ["receipt_note"];
+
   return (
     <>
       <section className="panel">
         <PanelHeading
-          title="Business settings"
-          subtitle="Stored in the settings table and editable by managers"
+          title="Business profile"
+          subtitle="Shown on printed reports and used for all money formatting"
         />
         {!settings && loading && <p className="hint">Loading…</p>}
         {settings && (
-          <form className="form-grid" onSubmit={submit}>
+          <form
+            className="form-grid"
+            onSubmit={e => {
+              e.preventDefault();
+              void saveKeys(PROFILE_KEYS);
+            }}
+          >
             <Field label="Business name">
               <input
                 value={settings.business_name}
-                onChange={e =>
-                  setSettings({ ...settings, business_name: e.target.value })
-                }
+                onChange={e => patch({ business_name: e.target.value })}
               />
             </Field>
-            <Field label="Currency">
+            <Field label="Phone (optional)">
+              <input
+                value={settings.business_phone}
+                placeholder="+92 300 1234567"
+                onChange={e => patch({ business_phone: e.target.value })}
+              />
+            </Field>
+            <Field label="Address (optional)">
+              <input
+                value={settings.business_address}
+                placeholder="Gold Market, Lahore"
+                onChange={e => patch({ business_address: e.target.value })}
+              />
+            </Field>
+            <Field label="Currency code">
               <input
                 value={settings.currency}
-                onChange={e =>
-                  setSettings({ ...settings, currency: e.target.value })
-                }
+                maxLength={10}
+                onChange={e => patch({ currency: e.target.value })}
               />
-            </Field>
-            <Field label="Default stock location">
-              <input
-                value={settings.default_location}
-                onChange={e =>
-                  setSettings({ ...settings, default_location: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Allow negative stock">
-              <select
-                value={settings.allow_negative_stock}
-                onChange={e =>
-                  setSettings({
-                    ...settings,
-                    allow_negative_stock: e.target.value
-                  })
-                }
-              >
-                <option value="false">No — block negative stock</option>
-                <option value="true">Yes — allow negative stock</option>
-              </select>
             </Field>
             <div className="form-actions">
               <button
                 type="submit"
                 className="primary-button"
-                disabled={saving || !isAdmin}
+                disabled={isSaving(PROFILE_KEYS) || !isAdmin}
               >
-                {saving ? "Saving…" : "Save settings"}
+                {isSaving(PROFILE_KEYS) ? "Saving…" : "Save profile"}
               </button>
             </div>
             {!isAdmin && (
@@ -237,6 +265,161 @@ export default function SettingsPage({
           </form>
         )}
       </section>
+
+      <section className="panel">
+        <PanelHeading
+          title="Inventory & trading"
+          subtitle="Defaults for new transactions and stock warnings"
+        />
+        {settings && (
+          <form
+            className="form-grid"
+            onSubmit={e => {
+              e.preventDefault();
+              void saveKeys(INVENTORY_KEYS);
+            }}
+          >
+            <Field label="Default stock location">
+              <input
+                value={settings.default_location}
+                onChange={e => patch({ default_location: e.target.value })}
+              />
+            </Field>
+            <Field label="Default rate unit">
+              <select
+                value={settings.default_rate_unit}
+                onChange={e =>
+                  patch({
+                    default_rate_unit: e.target.value as AppSettings["default_rate_unit"]
+                  })
+                }
+              >
+                <option value="tola">Tola</option>
+                <option value="gram">Gram</option>
+                <option value="kilogram">Kilogram</option>
+              </select>
+            </Field>
+            <Field label="Allow negative stock">
+              <select
+                value={settings.allow_negative_stock}
+                onChange={e => patch({ allow_negative_stock: e.target.value })}
+              >
+                <option value="false">No — block negative stock</option>
+                <option value="true">Yes — allow negative stock</option>
+              </select>
+            </Field>
+            <Field label="Low stock warning (grams)">
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={settings.low_stock_threshold}
+                placeholder="0 = off"
+                onChange={e => patch({ low_stock_threshold: e.target.value })}
+              />
+            </Field>
+            <div className="form-actions">
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={isSaving(INVENTORY_KEYS) || !isAdmin}
+              >
+                {isSaving(INVENTORY_KEYS) ? "Saving…" : "Save inventory settings"}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="panel">
+        <PanelHeading
+          title="Reports & printing"
+          subtitle="Footer note printed at the bottom of every report"
+        />
+        {settings && (
+          <form
+            className="form-grid"
+            onSubmit={e => {
+              e.preventDefault();
+              void saveKeys(REPORT_KEYS);
+            }}
+          >
+            <Field label="Report footer note (optional)">
+              <input
+                value={settings.receipt_note}
+                maxLength={255}
+                placeholder="Thank you for your business"
+                onChange={e => patch({ receipt_note: e.target.value })}
+              />
+            </Field>
+            <div className="form-actions">
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={isSaving(REPORT_KEYS) || !isAdmin}
+              >
+                {isSaving(REPORT_KEYS) ? "Saving…" : "Save report settings"}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      {isAdmin && (
+        <section className="panel">
+          <PanelHeading
+            title="System status"
+            subtitle="Read-only facts about this installation (no secrets)"
+          />
+          {systemInfo ? (
+            <div className="table-scroll">
+              <table>
+                <tbody>
+                  <tr>
+                    <td>App version</td>
+                    <td>{systemInfo.app_version}</td>
+                  </tr>
+                  <tr>
+                    <td>Database</td>
+                    <td>{systemInfo.database_backend}</td>
+                  </tr>
+                  <tr>
+                    <td>Backups encrypted</td>
+                    <td>{systemInfo.backup_encrypted ? "Yes (AES-256)" : "No"}</td>
+                  </tr>
+                  <tr>
+                    <td>Backup retention</td>
+                    <td>
+                      {systemInfo.backup_retention_days} days · keep newest{" "}
+                      {systemInfo.backup_keep_min}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Login rate limit</td>
+                    <td>
+                      {systemInfo.login_rate_limit === 0
+                        ? "Disabled"
+                        : `${systemInfo.login_rate_limit}/min per user`}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Schema</td>
+                    <td>
+                      {systemInfo.auto_create_tables
+                        ? "Auto-create (dev)"
+                        : "Alembic migrations only"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : loading ? (
+            <p className="hint">Loading…</p>
+          ) : (
+            <Empty text="System status unavailable." />
+          )}
+        </section>
+      )}
 
       <section className="panel">
         <PanelHeading

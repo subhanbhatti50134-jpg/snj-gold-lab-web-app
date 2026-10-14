@@ -8,13 +8,36 @@ from app.services.audit import log_audit
 # Known settings and their defaults. Unknown keys are rejected so a typo
 # cannot silently create a setting nobody reads.
 DEFAULTS: dict[str, str] = {
+    # Business profile (shown on printed reports and receipts)
     "business_name": "SNJ Gold Lab",
+    "business_phone": "",
+    "business_address": "",
     "currency": "PKR",
+    # Inventory & trading defaults
     "default_location": "Main Store",
+    "default_rate_unit": "tola",
     "allow_negative_stock": "false",
+    # Warn on the inventory screen when a balance is at or below this
+    # many grams. 0 disables the warning.
+    "low_stock_threshold": "0",
+    # Footer note printed on reports.
+    "receipt_note": "",
 }
 
 BOOLEAN_KEYS = ("allow_negative_stock",)
+
+# Enumerated values: key -> allowed values.
+ENUM_KEYS: dict[str, tuple[str, ...]] = {
+    "default_rate_unit": ("gram", "tola", "kilogram"),
+}
+
+# Numeric settings: key -> inclusive upper bound (must be >= 0).
+NUMERIC_KEYS: dict[str, float] = {
+    "low_stock_threshold": 1_000_000,
+}
+
+# Settings that may be left empty (optional profile fields).
+OPTIONAL_KEYS = ("business_phone", "business_address", "receipt_note")
 
 
 def get_settings(db: Session) -> dict[str, str]:
@@ -59,11 +82,39 @@ def validate_settings(payload: dict[str, str]) -> dict[str, str]:
                     detail=f"{key} must be true or false",
                 )
             text = text.lower()
+        elif key in ENUM_KEYS:
+            allowed = ENUM_KEYS[key]
+            if text.lower() not in allowed:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{key} must be one of: {', '.join(allowed)}",
+                )
+            text = text.lower()
+        elif key in NUMERIC_KEYS:
+            try:
+                number = float(text)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{key} must be a number",
+                ) from exc
+            if number < 0 or number > NUMERIC_KEYS[key]:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{key} must be between 0 and {NUMERIC_KEYS[key]:g}",
+                )
+            text = f"{number:g}"
         elif key == "currency":
             if not text or len(text) > 10:
                 raise HTTPException(
                     status_code=422,
                     detail="currency must be 1-10 characters",
+                )
+        elif key in OPTIONAL_KEYS:
+            if len(text) > 255:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{key} must be at most 255 characters",
                 )
         elif not text or len(text) > 255:
             raise HTTPException(

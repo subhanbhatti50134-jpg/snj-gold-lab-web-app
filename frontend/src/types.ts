@@ -94,9 +94,24 @@ export interface AuditEntry {
 
 export interface AppSettings {
   business_name: string;
+  business_phone: string;
+  business_address: string;
   currency: string;
   default_location: string;
+  default_rate_unit: "gram" | "tola" | "kilogram";
   allow_negative_stock: string;
+  low_stock_threshold: string;
+  receipt_note: string;
+}
+
+export interface SystemInfo {
+  app_version: string;
+  database_backend: string;
+  backup_encrypted: boolean;
+  backup_retention_days: number;
+  backup_keep_min: number;
+  login_rate_limit: number;
+  auto_create_tables: boolean;
 }
 
 export interface BackupInfo {

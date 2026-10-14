@@ -126,6 +126,13 @@ export default function ReportsPage({
       <div className="print-header">
         <h1>{settings?.business_name || "SNJ Gold Lab"}</h1>
         <h2>Financial report</h2>
+        {(settings?.business_address || settings?.business_phone) && (
+          <p>
+            {settings?.business_address}
+            {settings?.business_address && settings?.business_phone ? " · " : ""}
+            {settings?.business_phone}
+          </p>
+        )}
         <p>
           {dateFrom || dateTo
             ? `Period: ${dateFrom || "beginning"} to ${dateTo || "today"}`
@@ -389,6 +396,12 @@ export default function ReportsPage({
           )}
         </div>
       </section>
+
+      {settings?.receipt_note && (
+        <p className="print-only" style={{ textAlign: "center", marginTop: 24 }}>
+          {settings.receipt_note}
+        </p>
+      )}
 
     </>
   );

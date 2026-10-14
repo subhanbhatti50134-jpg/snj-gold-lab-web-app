@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CurrentUser } from "../api";
-import type {InventoryRow, Product} from "../types";
+import type {AppSettings, InventoryRow, Product} from "../types";
 import { Empty, MetalTag, PanelHeading } from "../ui";
 
 export default function InventoryPage({
@@ -14,6 +14,7 @@ export default function InventoryPage({
 }) {
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [threshold, setThreshold] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
@@ -23,14 +24,19 @@ export default function InventoryPage({
 
     Promise.allSettled([
       api<InventoryRow[]>("/api/inventory"),
-      api<Product[]>("/api/products?limit=1000")
+      api<Product[]>("/api/products?limit=1000"),
+      api<AppSettings>("/api/settings")
     ])
-      .then(([inv, prods]) => {
+      .then(([inv, prods, set]) => {
         if (cancelled) return;
         if (inv.status === "fulfilled") setRows(inv.value);
         else fail(inv.reason);
         if (prods.status === "fulfilled") setProducts(prods.value);
         else fail(prods.reason);
+        if (set.status === "fulfilled") {
+          const value = Number(set.value.low_stock_threshold || 0);
+          setThreshold(Number.isFinite(value) && value > 0 ? value : 0);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -60,6 +66,11 @@ export default function InventoryPage({
       (!location || row.location === location)
     );
   });
+
+  const lowCount =
+    threshold > 0
+      ? filtered.filter(row => Number(row.balance_grams) <= threshold).length
+      : 0;
 
   return (
     <section className="panel">
@@ -113,6 +124,16 @@ export default function InventoryPage({
                   <td>{row.location}</td>
                   <td>
                     <b>{row.balance_grams} g</b>
+                    {threshold > 0 &&
+                      Number(row.balance_grams) <= threshold && (
+                        <span
+                          className="kind purchase"
+                          style={{ marginLeft: 6 }}
+                          title={`At or below the ${threshold} g low-stock threshold`}
+                        >
+                          Low
+                        </span>
+                      )}
                   </td>
                   <td>
                     <MetalTag metal={product?.metal || "other"} />
@@ -127,6 +148,12 @@ export default function InventoryPage({
           <Empty text="No inventory rows found. Record a purchase to add stock." />
         )}
       </div>
+      {threshold > 0 && lowCount > 0 && (
+        <p className="hint" style={{ padding: "0 19px 16px" }}>
+          {lowCount} of {filtered.length} rows at or below the {threshold} g
+          low-stock threshold (set in Settings → Inventory & trading).
+        </p>
+      )}
     </section>
   );
 }

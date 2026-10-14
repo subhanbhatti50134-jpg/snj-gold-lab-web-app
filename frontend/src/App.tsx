@@ -31,9 +31,11 @@ import {
   errorText,
   getToken,
   login,
+  setCurrency,
   UNAUTHORIZED_EVENT,
   type CurrentUser
 } from "./api";
+import type { AppSettings } from "./types";
 import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import RatesPage from "./pages/RatesPage";
@@ -121,6 +123,23 @@ export default function App() {
     window.addEventListener(UNAUTHORIZED_EVENT, onExpired);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onExpired);
   }, []);
+
+  // Apply the money currency from settings (refreshed after any bump so
+  // a currency change on the Settings page takes effect immediately).
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    api<AppSettings>("/api/settings")
+      .then(s => {
+        if (!cancelled) setCurrency(s.currency);
+      })
+      .catch(() => {
+        // Keep the default currency when settings are unreachable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, refreshKey]);
 
   const fail = useCallback((err: unknown) => {
     setError(errorText(err));
