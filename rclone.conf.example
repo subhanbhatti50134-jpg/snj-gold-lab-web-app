@@ -1,0 +1,21 @@
+# Example rclone config for offsite backup sync.
+# Copy this file to ./rclone.conf (same folder as docker-compose.yml) and
+# edit it for your storage provider. The real rclone.conf is gitignored
+# because it can contain OAuth tokens.
+#
+# Setup for Google Drive (recommended free option):
+#   1. On the host:  rclone config
+#   2. Choose n = new remote, name it gdrive, pick "drive"
+#   3. Follow the OAuth prompt (rclone opens a browser link)
+#   4. Copy the [gdrive] section from ~/.config/rclone/rclone.conf
+#      into this file's place below, then set in .env:
+#        RCLONE_REMOTE=gdrive:snj-gold-lab-backups
+#
+# Local-directory remote (for testing the sync mechanism without cloud):
+#   [localoffsite]
+#   type = local
+#   ...then set RCLONE_REMOTE=localoffsite:/path/on/host
+
+[gdrive]
+type = drive
+# token = ...  (paste the token line rclone generated for you)

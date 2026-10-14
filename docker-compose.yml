@@ -8,8 +8,8 @@ services:
       POSTGRES_DB: hisabpro
       POSTGRES_USER: hisabpro
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port on purpose: the database must never be reachable from
+    # outside the compose network. Backend talks to it as db:5432.
     volumes:
       - hisabpro_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,6 +31,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       HISABPRO_BACKUP_DIR: /app/backups
+      # Encrypted backups at rest (AES-256-GCM). Generate with:
+      #   python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+      HISABPRO_BACKUP_KEY: ${HISABPRO_BACKUP_KEY:?Set HISABPRO_BACKUP_KEY in .env}
+      HISABPRO_BACKUP_RETENTION_DAYS: ${HISABPRO_BACKUP_RETENTION_DAYS:-30}
+      HISABPRO_BACKUP_KEEP_MIN: ${HISABPRO_BACKUP_KEEP_MIN:-5}
       # Alembic (run by the Dockerfile CMD) owns the schema in production.
       HISABPRO_AUTO_CREATE_TABLES: "false"
     volumes:
@@ -46,6 +51,44 @@ services:
       - backend
     ports:
       - "8080:80"
+
+  # Offsite backup sync (opt-in). Enable with:
+  #   docker compose --profile offsite up -d
+  # Needs an rclone config file next to this compose file (see README):
+  #   rclone config   # then copy the result to ./rclone.conf
+  # RCLONE_REMOTE example: gdrive:snj-gold-lab-backups
+  backup-sync:
+    image: rclone/rclone:1.69
+    container_name: hisabpro-backup-sync
+    restart: unless-stopped
+    profiles: ["offsite"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_INTERVAL: ${RCLONE_INTERVAL:-86400}
+    volumes:
+      - hisabpro_backups:/backups:ro
+      # :Z needed on SELinux hosts (Fedora/RHEL) so the container can read it.
+      - ./rclone.conf:/config/rclone.conf:ro,Z
+    # The rclone image has ENTRYPOINT ["rclone"], so we override it to run
+    # a shell loop instead. Sync immediately, then every RCLONE_INTERVAL
+    # seconds. If RCLONE_REMOTE is empty the container just idles with a
+    # warning (so the default compose up never fails because of this profile).
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -z "$${RCLONE_REMOTE}" ]; then
+          echo "RCLONE_REMOTE not set - offsite sync disabled. Set it in .env and restart."
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          echo "$$(date -Is) rclone sync /backups -> $${RCLONE_REMOTE}"
+          rclone sync /backups "$${RCLONE_REMOTE}" --config /config/rclone.conf --transfers 4 || \
+            echo "$$(date -Is) sync failed (will retry)"
+          sleep "$${RCLONE_INTERVAL}"
+        done
 
 volumes:
   hisabpro_data:

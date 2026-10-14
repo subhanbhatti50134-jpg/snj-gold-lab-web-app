@@ -30,6 +30,7 @@ nohup.out
 *.pfx
 id_rsa*
 id_ed25519*
+rclone.conf
 
 # OS / editor junk
 .DS_Store

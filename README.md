@@ -211,22 +211,85 @@ CI runs the SQLite tests, the PostgreSQL integration tests, the frontend
 unit tests and the frontend build on every push
 (`.github/workflows/ci.yml`).
 
-## 5. Docker (optional)
+## 5. Docker / Podman (portable deployment)
 
 With Docker or Podman installed, the whole stack runs with one command
-(values come from the project `.env` file):
+(values come from the project `.env` file next to `docker-compose.yml`):
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d          # or: podman-compose up -d
 ```
 
 - Frontend: <http://localhost:8080> (nginx serves the build and proxies
   `/api` to the backend)
 - Backend: <http://127.0.0.1:8000/docs>
-- PostgreSQL: `127.0.0.1:5432` (data in the `hisabpro_data` volume)
-- Backups inside the container land in the `hisabpro_backups` volume
+- PostgreSQL: **internal only** — no host port is published; the
+  database is reachable solely inside the compose network (data lives
+  in the `hisabpro_data` volume)
+- Backups land encrypted (`.enc`) in the `hisabpro_backups` volume
+
+First run on a fresh machine — create the admin account:
+
+```bash
+docker compose exec -it backend python scripts/create_admin.py
+# (podman: podman-compose exec backend python scripts/create_admin.py)
+```
+
+### Moving to another laptop / server
+
+Everything (database + encrypted backups) lives in two named Docker
+volumes, so the whole system moves with these steps:
+
+```bash
+# 1) On the OLD machine — dump the database and copy the backups volume out
+docker compose exec -db pg_dump -U hisabpro -Fc hisabpro > hisabpro.dump
+docker run --rm -v hisabpro_hisabpro_backups:/b -v "$PWD":/out alpine \
+  tar czf /out/backups-volume.tgz -C /b .
+# (podman: replace the volume name shown by `podman volume ls`)
+
+# 2) Copy the project folder + the two files to the NEW machine
+scp -r ./ hisabpro-new:~/hisabpro/
+scp hisabpro.dump backups-volume.tgz hisabpro-new:~/hisabpro/
+
+# 3) On the NEW machine — start the stack, load data, create admin
+cd ~/hisabpro
+cp backend/.env.example .env   # then edit: strong POSTGRES_PASSWORD,
+                               # JWT_SECRET_KEY (>=32 chars), HISABPRO_BACKUP_KEY
+docker compose up --build -d
+docker compose exec -T db psql -U hisabpro -d hisabpro -c 'CREATE DATABASE hisabpro;'
+docker compose exec -T db pg_restore -U hisabpro -d hisabpro --clean --if-exists < hisabpro.dump
+docker run --rm -v hisabpro_hisabpro_backups:/b -v "$PWD":/out alpine \
+  tar xzf /out/backups-volume.tgz -C /b
+```
+
+The JWT secret stays the same only if you copy the old `.env`; otherwise
+everyone simply logs in again with their existing username/password
+(passwords are stored as hashes, not in `.env`).
+
+### Offsite backups with rclone (opt-in)
+
+Encrypted backups are copied to cloud storage on an interval so a disk
+failure cannot take data *and* backups together:
+
+```bash
+rclone config                     # e.g. create remote "gdrive" (Google Drive)
+cp rclone.conf.example rclone.conf  # paste your remote's section into it
+# in .env add:
+#   RCLONE_REMOTE=gdrive:snj-gold-lab-backups
+#   RCLONE_INTERVAL=86400         # seconds between syncs (default 1 day)
+docker compose --profile offsite up -d
+```
+
+`rclone.conf` is gitignored (it can contain OAuth tokens). The sync
+container idles harmlessly until `RCLONE_REMOTE` is set.
 
 ## 6. Backup & restore
+
+Backups are **encrypted at rest** (AES-256-GCM, key from
+`HISABPRO_BACKUP_KEY`) and pruned automatically after
+`HISABPRO_BACKUP_RETENTION_DAYS` (default 30, never below
+`HISABPRO_BACKUP_KEEP_MIN` = 5 newest). Enable offsite rclone sync as
+described in section 5.
 
 Two backup formats, both admin-only (**Settings → Database backups**):
 
