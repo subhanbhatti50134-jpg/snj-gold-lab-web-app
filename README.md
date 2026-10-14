@@ -182,6 +182,12 @@ cd backend
 .venv/bin/python -m pytest tests -q
 ```
 
+This includes `tests/test_acceptance.py` — scenario-level journeys
+(full trading day, returns, paid-sale cancellation, oversell/overpay
+guards, POS double-submit, role boundaries, user lifecycle, backup
+restore drill) that verify the business rules end to end, plus unit
+tests for every module.
+
 Backend against PostgreSQL (uses an isolated `hisabpro_test` schema):
 
 ```bash
