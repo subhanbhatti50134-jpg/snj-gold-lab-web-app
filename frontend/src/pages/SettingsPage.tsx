@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { API_BASE, api, atLeast, getToken, type CurrentUser } from "../api";
-import type {AppSettings, BackupInfo, SystemInfo} from "../types";
-import { Empty, Field, Modal, PanelHeading } from "../ui";
+import type {AppSettings, BackupInfo, SystemInfo, UserData} from "../types";
+import { Empty, Field, Modal, PanelHeading, Status, pretty } from "../ui";
 
 interface RestoreResult {
   filename: string;
   restored: boolean;
   restored_at: string;
 }
+
+const ROLES = ["viewer", "operator", "manager", "admin"] as const;
+
+const blankUser = { username: "", password: "", role: "operator" };
 
 export default function SettingsPage({
   user,
@@ -34,6 +38,21 @@ export default function SettingsPage({
   const [confirmText, setConfirmText] = useState("");
   const [restoring, setRestoring] = useState(false);
 
+  // User management (admin only).
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addUserForm, setAddUserForm] = useState(blankUser);
+  const [savingUser, setSavingUser] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<UserData | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [renameTarget, setRenameTarget] = useState<UserData | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{
+    target: UserData;
+    role?: string;
+    active?: boolean;
+  } | null>(null);
+
   const isAdmin = atLeast(user, "admin");
 
   useEffect(() => {
@@ -44,10 +63,11 @@ export default function SettingsPage({
     if (isAdmin) {
       tasks.push(api<BackupInfo[]>("/api/backups"));
       tasks.push(api<SystemInfo>("/api/settings/system"));
+      tasks.push(api<UserData[]>("/api/users"));
     }
 
     Promise.allSettled(tasks)
-      .then(([set, bak, sys]) => {
+      .then(([set, bak, sys, usr]) => {
         if (cancelled) return;
         if (set.status === "fulfilled") setSettings(set.value as AppSettings);
         else fail(set.reason);
@@ -56,6 +76,9 @@ export default function SettingsPage({
         }
         if (sys && sys.status === "fulfilled") {
           setSystemInfo(sys.value as SystemInfo);
+        }
+        if (usr && usr.status === "fulfilled") {
+          setUsers(usr.value as UserData[]);
         }
       })
       .finally(() => {
@@ -66,6 +89,103 @@ export default function SettingsPage({
       cancelled = true;
     };
   }, [fail, isAdmin, refreshKey]);
+
+  async function reloadUsers() {
+    const rows = await api<UserData[]>("/api/users");
+    setUsers(rows);
+  }
+
+  async function submitAddUser(event: FormEvent) {
+    event.preventDefault();
+    setSavingUser(true);
+
+    try {
+      await api("/api/users", {
+        method: "POST",
+        body: JSON.stringify(addUserForm)
+      });
+      notice("User create ho gaya.");
+      setShowAddUser(false);
+      setAddUserForm(blankUser);
+      await reloadUsers();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function applyUserAction() {
+    if (!confirmAction) return;
+
+    try {
+      if (confirmAction.role !== undefined) {
+        await api(`/api/users/${confirmAction.target.id}/role`, {
+          method: "PATCH",
+          body: JSON.stringify({ role: confirmAction.role })
+        });
+        notice(
+          `${confirmAction.target.username} ka role ${confirmAction.role} ho gaya.`
+        );
+      } else if (confirmAction.active !== undefined) {
+        await api(`/api/users/${confirmAction.target.id}/active`, {
+          method: "PATCH",
+          body: JSON.stringify({ active: confirmAction.active })
+        });
+        notice(
+          confirmAction.active
+            ? `${confirmAction.target.username} activate ho gaya.`
+            : `${confirmAction.target.username} deactivate ho gaya.`
+        );
+      }
+      await reloadUsers();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setConfirmAction(null);
+    }
+  }
+
+  async function submitPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!passwordTarget) return;
+    setSavingUser(true);
+
+    try {
+      await api(`/api/users/${passwordTarget.id}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: newPassword })
+      });
+      notice(`${passwordTarget.username} ka password change ho gaya.`);
+      setPasswordTarget(null);
+      setNewPassword("");
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function submitRename(event: FormEvent) {
+    event.preventDefault();
+    if (!renameTarget) return;
+    setSavingUser(true);
+
+    try {
+      await api(`/api/users/${renameTarget.id}/username`, {
+        method: "PATCH",
+        body: JSON.stringify({ username: newUsername })
+      });
+      notice(`Username "${renameTarget.username}" → "${newUsername}".`);
+      setRenameTarget(null);
+      setNewUsername("");
+      await reloadUsers();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSavingUser(false);
+    }
+  }
 
   function patch(partial: Partial<AppSettings>) {
     setSettings(prev => (prev ? { ...prev, ...partial } : prev));
@@ -421,6 +541,118 @@ export default function SettingsPage({
         </section>
       )}
 
+      {isAdmin && (
+        <section className="panel">
+          <PanelHeading
+            title="Users & access"
+            subtitle="Add users, change roles, reset passwords or rename accounts. Every change is audit-logged."
+            action={
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setAddUserForm(blankUser);
+                  setShowAddUser(true);
+                }}
+              >
+                Add user
+              </button>
+            }
+          />
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(row => (
+                  <tr key={row.id}>
+                    <td>
+                      <b>{row.username}</b>
+                      {row.id === user.id && (
+                        <span style={{ fontSize: 9, color: "#66768b" }}>
+                          {" "}
+                          (you)
+                        </span>
+                      )}
+                    </td>
+                    <td>{pretty(row.role)}</td>
+                    <td>
+                      <Status active={row.active} />
+                    </td>
+                    <td>{new Date(row.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <select
+                          value={row.role}
+                          disabled={row.id === user.id}
+                          onChange={e =>
+                            setConfirmAction({
+                              target: row,
+                              role: e.target.value
+                            })
+                          }
+                          style={{
+                            padding: "5px 7px",
+                            border: "1px solid #e7ecf2",
+                            borderRadius: 6,
+                            fontSize: 10
+                          }}
+                        >
+                          {ROLES.map(role => (
+                            <option key={role} value={role}>
+                              {role}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            setPasswordTarget(row);
+                            setNewPassword("");
+                          }}
+                        >
+                          Password
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            setRenameTarget(row);
+                            setNewUsername(row.username);
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          className="text-button"
+                          disabled={row.id === user.id}
+                          onClick={() =>
+                            setConfirmAction({
+                              target: row,
+                              active: !row.active
+                            })
+                          }
+                        >
+                          {row.active ? "Deactivate" : "Activate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!users.length && !loading && (
+              <Empty text="No users found." />
+            )}
+          </div>
+        </section>
+      )}
+
       <section className="panel">
         <PanelHeading
           title="Database backups"
@@ -581,6 +813,172 @@ export default function SettingsPage({
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {showAddUser && (
+        <Modal
+          title="Add user"
+          subtitle="Password must be at least 12 characters."
+          onClose={() => setShowAddUser(false)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitAddUser}>
+            <Field label="Username">
+              <input
+                required
+                minLength={3}
+                value={addUserForm.username}
+                onChange={e =>
+                  setAddUserForm({ ...addUserForm, username: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Password">
+              <input
+                required
+                type="password"
+                minLength={12}
+                value={addUserForm.password}
+                onChange={e =>
+                  setAddUserForm({ ...addUserForm, password: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Role">
+              <select
+                value={addUserForm.role}
+                onChange={e =>
+                  setAddUserForm({ ...addUserForm, role: e.target.value })
+                }
+              >
+                {ROLES.map(role => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setShowAddUser(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={savingUser}
+              >
+                {savingUser ? "Saving…" : "Create user"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {passwordTarget && (
+        <Modal
+          title="Change password"
+          subtitle={`Set a new password for ${passwordTarget.username}. Minimum 12 characters.`}
+          onClose={() => setPasswordTarget(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitPassword}>
+            <Field label="New password">
+              <input
+                required
+                type="password"
+                minLength={12}
+                autoFocus
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+              />
+            </Field>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setPasswordTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={savingUser}
+              >
+                {savingUser ? "Saving…" : "Change password"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {renameTarget && (
+        <Modal
+          title="Change username"
+          subtitle={`Rename ${renameTarget.username}. The user logs in with the new name.`}
+          onClose={() => setRenameTarget(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitRename}>
+            <Field label="New username">
+              <input
+                required
+                minLength={3}
+                maxLength={80}
+                autoFocus
+                value={newUsername}
+                onChange={e => setNewUsername(e.target.value)}
+              />
+            </Field>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setRenameTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={savingUser || newUsername === renameTarget.username}
+              >
+                {savingUser ? "Saving…" : "Change username"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {confirmAction && (
+        <Modal
+          title="Confirm change"
+          subtitle={`Update ${confirmAction.target.username}?`}
+          onClose={() => setConfirmAction(null)}
+        >
+          <p className="hint">
+            {confirmAction.role !== undefined
+              ? `Role will become "${confirmAction.role}".`
+              : confirmAction.active
+                ? "The account will be able to log in again."
+                : "The account will be blocked from logging in."}
+          </p>
+          <div className="form-actions">
+            <button
+              className="secondary-button"
+              onClick={() => setConfirmAction(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary-button"
+              onClick={() => void applyUserAction()}
+            >
+              Confirm
+            </button>
+          </div>
         </Modal>
       )}
     </>

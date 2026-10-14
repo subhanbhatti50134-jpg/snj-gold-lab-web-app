@@ -35,6 +35,14 @@ class ActiveUpdate(BaseModel):
     active: bool
 
 
+class PasswordUpdate(BaseModel):
+    password: str = Field(min_length=12, max_length=256)
+
+
+class UsernameUpdate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+
+
 def user_data(user: User) -> dict:
     return {
         "id": user.id,
@@ -148,5 +156,76 @@ def update_user_active(
         detail=f"{user.username} -> active={data.active}",
     )
     db.commit()
+    db.refresh(user)
+    return user_data(user)
+
+
+@router.patch("/{user_id}/password")
+def update_user_password(
+    user_id: int,
+    data: PasswordUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("admin")),
+):
+    """Admin reset of any user's password (including their own).
+
+    The old password is never requested or logged; the new one is only
+    ever stored as an argon2 hash.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = hash_password(data.password)
+
+    log_audit(
+        db,
+        username=admin.username,
+        action="user.password_change",
+        entity_type="user",
+        entity_id=user.id,
+        detail=f"password reset for {user.username}",
+    )
+    db.commit()
+    db.refresh(user)
+    return user_data(user)
+
+
+@router.patch("/{user_id}/username")
+def update_user_username(
+    user_id: int,
+    data: UsernameUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("admin")),
+):
+    """Admin rename of any user (including their own).
+
+    Safe for the logged-in admin: JWTs carry the user id, not the
+    username, so an existing session survives the rename.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_username = user.username
+    user.username = data.username
+
+    try:
+        log_audit(
+            db,
+            username=admin.username,
+            action="user.username_change",
+            entity_type="user",
+            entity_id=user.id,
+            detail=f"{old_username} -> {data.username}",
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists",
+        )
+
     db.refresh(user)
     return user_data(user)

@@ -21,7 +21,6 @@ import {
   ShoppingCart,
   ShoppingBag,
   Store,
-  UserRoundCog,
   Users,
   Wallet
 } from "lucide-react";
@@ -46,7 +45,6 @@ import TransactionsPage from "./pages/TransactionsPage";
 import PartiesPage from "./pages/PartiesPage";
 import MovementsPage from "./pages/MovementsPage";
 import ReportsPage from "./pages/ReportsPage";
-import UsersPage from "./pages/UsersPage";
 import AuditPage from "./pages/AuditPage";
 import SettingsPage from "./pages/SettingsPage";
 import { Field, Modal } from "./ui";
@@ -79,9 +77,10 @@ const NAV: { label: Page; icon: typeof LayoutDashboard; min: "viewer" | "operato
   { label: "Parties", icon: Users, min: "viewer" },
   { label: "Stock Movements", icon: ClipboardList, min: "manager" },
   { label: "Reports", icon: ScrollText, min: "viewer" },
-  { label: "Users", icon: UserRoundCog, min: "admin" },
   { label: "Audit Log", icon: History, min: "admin" },
-  { label: "Settings", icon: SettingsIcon, min: "admin" }
+  // Visible to managers so they can view settings; the page itself
+  // restricts saving to admins only.
+  { label: "Settings", icon: SettingsIcon, min: "manager" }
 ];
 
 const RANK = { viewer: 0, operator: 1, manager: 2, admin: 3 } as const;
@@ -483,15 +482,6 @@ function PageBody({
       );
     case "Reports":
       return <ReportsPage user={user} fail={fail} refreshKey={refreshKey} />;
-    case "Users":
-      return (
-        <UsersPage
-          user={user}
-          fail={fail}
-          notice={notice}
-          refreshKey={refreshKey}
-        />
-      );
     case "Audit Log":
       return <AuditPage user={user} fail={fail} refreshKey={refreshKey} />;
     case "Settings":
