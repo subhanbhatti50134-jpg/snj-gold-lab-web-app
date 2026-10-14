@@ -35,6 +35,11 @@ CORS_ORIGINS = [
 # Failed logins allowed per client+username per minute. 0 disables.
 LOGIN_RATE_LIMIT = int(os.getenv("HISABPRO_LOGIN_RATE_LIMIT", "10"))
 
+# Logging: level always applies; file logging only when LOG_DIR is set
+# (docker compose points this at a persistent volume). Empty = stdout only.
+LOG_LEVEL = os.getenv("HISABPRO_LOG_LEVEL", "INFO").upper()
+LOG_DIR = os.getenv("HISABPRO_LOG_DIR", "").strip()
+
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is missing from the project .env file")
 
@@ -49,6 +54,11 @@ if len(JWT_SECRET_KEY) < 32:
     raise RuntimeError(
         "JWT_SECRET_KEY must be at least 32 characters. "
         "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+    )
+
+if LOG_LEVEL not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+    raise RuntimeError(
+        f"HISABPRO_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL (got {LOG_LEVEL!r})"
     )
 
 # Development convenience: create tables on startup when True.

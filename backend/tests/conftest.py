@@ -30,6 +30,9 @@ os.environ["HISABPRO_BACKUP_DIR"] = "/tmp/hisabpro-test-backups"
 # Default to plaintext backups in tests so existing assertions hold.
 # Encryption tests monkeypatch app.services.backup.BACKUP_KEY explicitly.
 os.environ["HISABPRO_BACKUP_KEY"] = ""
+# Keep pytest output clean; request-log tests raise the level via caplog.
+os.environ["HISABPRO_LOG_LEVEL"] = "WARNING"
+os.environ["HISABPRO_LOG_DIR"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

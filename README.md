@@ -313,7 +313,23 @@ pg_dump -Fc -h 127.0.0.1 -U hisabpro -d hisabpro -f backups/my-backup.dump
 pg_restore --clean --if-exists -h 127.0.0.1 -U hisabpro -d hisabpro backups/my-backup.dump
 ```
 
-## 7. Accounting rules
+## 7. Monitoring & logs
+
+- **Live logs:** `podman logs -f hisabpro-backend` (or `docker logs`).
+- **Rotating log file:** when `HISABPRO_LOG_DIR` is set (compose sets
+  `/app/logs` in a persistent volume) the backend also writes
+  `hisabpro.log` — 5 MB per file, 5 backups kept. Format:
+  `2026-10-14T16:48:26+0500 INFO     hisabpro request method=GET path=/api/products status=200 duration_ms=12.3 auth=token`
+- **`GET /health`** — public liveness probe: version, uptime, database
+  reachability + latency (returns 503 when the database is down).
+- **`GET /api/metrics`** — admin-only self-hosted metrics: total
+  requests, per-status-class and per-method counts, average latency,
+  and the last 50 five-hundred responses with time/path for triage.
+- Unhandled exceptions are logged with full tracebacks server-side and
+  return only `{"detail": "Internal server error"}` to clients.
+- Raise verbosity with `HISABPRO_LOG_LEVEL=DEBUG` in `.env`.
+
+## 8. Accounting rules
 
 - Sale totals = net weight × rate per gram × purity / 100 + charges.
 - A **sales return** reduces the customer's receivable.
@@ -324,7 +340,7 @@ pg_restore --clean --if-exists -h 127.0.0.1 -U hisabpro -d hisabpro backups/my-b
 - Cancelled transactions are excluded from summaries and outstanding reports,
   but their payments (including refunds) still appear in cashflow.
 
-## 8. Project layout
+## 9. Project layout
 
 ```
 backend/
@@ -350,15 +366,23 @@ frontend/
     App.tsx           # shell: login, sidebar, routing
 ```
 
-## 9. Environment variables
+## 10. Environment variables
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | backend `.env` | SQLAlchemy connection string (required) |
-| `POSTGRES_PASSWORD` | backend `.env` | interpolated into `DATABASE_URL` |
-| `JWT_SECRET_KEY` | backend `.env` | signing key for access tokens (required) |
+| `POSTGRES_PASSWORD` | backend `.env` | interpolated into `DATABASE_URL` (compose) |
+| `JWT_SECRET_KEY` | backend `.env` | signing key for access tokens (required, ≥32 chars) |
 | `HISABPRO_API_KEY` | backend `.env` | legacy shared key (routers use JWT) |
+| `HISABPRO_BACKUP_KEY` | backend `.env` | base64 32-byte AES key for encrypted backups |
 | `HISABPRO_BACKUP_DIR` | backend env | backup folder (default `~/hisabpro/backups`) |
+| `HISABPRO_BACKUP_RETENTION_DAYS` | backend env | prune backups older than N days (default 30) |
+| `HISABPRO_BACKUP_KEEP_MIN` | backend env | never prune the newest N backups (default 5) |
+| `HISABPRO_AUTO_CREATE_TABLES` | backend env | dev-only schema create; production uses Alembic (`false`) |
+| `HISABPRO_LOG_LEVEL` | backend env | DEBUG/INFO/WARNING/ERROR/CRITICAL (default INFO) |
+| `HISABPRO_LOG_DIR` | backend env | rotating log folder; empty = stdout only |
 | `CORS_ORIGINS` | backend `.env` | comma-separated browser origins (default Vite dev) |
 | `HISABPRO_LOGIN_RATE_LIMIT` | backend `.env` | failed logins per client+username per minute (default 10, `0` off) |
+| `RCLONE_REMOTE` | compose `.env` | offsite backup destination (e.g. `gdrive:snj-gold-lab-backups`) |
+| `RCLONE_INTERVAL` | compose `.env` | seconds between offsite syncs (default 86400) |
 | `VITE_API_BASE_URL` | frontend `.env` | backend origin (default `http://127.0.0.1:8000`) |

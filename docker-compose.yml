@@ -36,10 +36,14 @@ services:
       HISABPRO_BACKUP_KEY: ${HISABPRO_BACKUP_KEY:?Set HISABPRO_BACKUP_KEY in .env}
       HISABPRO_BACKUP_RETENTION_DAYS: ${HISABPRO_BACKUP_RETENTION_DAYS:-30}
       HISABPRO_BACKUP_KEEP_MIN: ${HISABPRO_BACKUP_KEEP_MIN:-5}
+      # Rotating application log (5 MB x 5) in a persistent volume.
+      HISABPRO_LOG_DIR: /app/logs
+      HISABPRO_LOG_LEVEL: ${HISABPRO_LOG_LEVEL:-INFO}
       # Alembic (run by the Dockerfile CMD) owns the schema in production.
       HISABPRO_AUTO_CREATE_TABLES: "false"
     volumes:
       - hisabpro_backups:/app/backups
+      - hisabpro_logs:/app/logs
     ports:
       - "127.0.0.1:8000:8000"
 
@@ -93,3 +97,4 @@ services:
 volumes:
   hisabpro_data:
   hisabpro_backups:
+  hisabpro_logs:
