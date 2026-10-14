@@ -293,7 +293,10 @@ export default function SettingsPage({
                   <td>
                     <b>{b.filename}</b>
                   </td>
-                  <td>{b.kind === "json" ? "JSON data" : "pg_dump"}</td>
+                  <td>
+                    {b.kind === "json" ? "JSON data" : "pg_dump"}
+                    {b.encrypted ? " · Encrypted" : ""}
+                  </td>
                   <td>{(b.size_bytes / 1024 / 1024).toFixed(2)} MB</td>
                   <td>{new Date(b.created_at).toLocaleString()}</td>
                   {isAdmin && (
@@ -360,7 +363,8 @@ export default function SettingsPage({
                 </option>
                 {backups.map(b => (
                   <option key={b.filename} value={b.filename}>
-                    {b.filename} · {b.kind === "json" ? "JSON data" : "pg_dump"} ·{" "}
+                    {b.filename} · {b.kind === "json" ? "JSON data" : "pg_dump"}
+                    {b.encrypted ? " · Encrypted" : ""} ·{" "}
                     {(b.size_bytes / 1024 / 1024).toFixed(2)} MB ·{" "}
                     {new Date(b.created_at).toLocaleString()}
                   </option>

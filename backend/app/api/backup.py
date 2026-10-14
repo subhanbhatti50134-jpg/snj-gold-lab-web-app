@@ -23,6 +23,7 @@ class BackupOut(BaseModel):
     filename: str
     size_bytes: int
     kind: Literal["pgdump", "json"] = "pgdump"
+    encrypted: bool = False
     created_at: datetime
 
 
@@ -57,6 +58,7 @@ def create_backup(
     user: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
     result = backup_service.create_backup()
+    pruned = result.pop("pruned", [])
 
     log_audit(
         db,
@@ -66,6 +68,15 @@ def create_backup(
         entity_id=result["filename"],
         detail=f"size {result['size_bytes']} bytes",
     )
+    for name in pruned:
+        log_audit(
+            db,
+            username=user.username,
+            action="backup.prune",
+            entity_type="database",
+            entity_id=name,
+            detail="backup pruned by retention policy",
+        )
     db.commit()
 
     return result
@@ -112,6 +123,7 @@ def create_json_backup(
 ):
     """Export all business data to a portable JSON backup file."""
     result = backup_service.create_json_backup(db)
+    pruned = result.pop("pruned", [])
 
     log_audit(
         db,
@@ -121,6 +133,15 @@ def create_json_backup(
         entity_id=result["filename"],
         detail="JSON data backup created",
     )
+    for name in pruned:
+        log_audit(
+            db,
+            username=user.username,
+            action="backup.prune",
+            entity_type="database",
+            entity_id=name,
+            detail="backup pruned by retention policy",
+        )
     db.commit()
 
     return result
@@ -133,9 +154,14 @@ def create_json_backup(
 def download_json_backup(filename: str):
     """Download a JSON backup file so it can be stored off the server."""
     path = backup_service._safe_json_path(filename)
+    media_type = (
+        "application/octet-stream"
+        if filename.endswith(".enc")
+        else "application/json"
+    )
     return FileResponse(
         path,
-        media_type="application/json",
+        media_type=media_type,
         filename=path.name,
     )
 

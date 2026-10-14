@@ -1,16 +1,27 @@
+import base64
 import json
 import os
 import re
 import subprocess
+import tempfile
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException
 from sqlalchemy import delete, inspect, select
 from sqlalchemy.orm import Session
 
-from app.core.config import DATABASE_URL, ROOT_DIR
+from app.core.config import (
+    BACKUP_KEY,
+    BACKUP_KEEP_MIN,
+    BACKUP_RETENTION_DAYS,
+    DATABASE_URL,
+    ROOT_DIR,
+)
+from app.models.idempotency import IdempotencyKey
 from app.models.metal_rate import MetalRate
 from app.models.payments import Payment
 from app.models.party import Party
@@ -27,9 +38,14 @@ BACKUP_DIR = Path(
 )
 
 FILENAME_PATTERN = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:dump|json)$"
+    r"^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:dump|json)(?:\.enc)?$"
 )
 TIMEOUT_SECONDS = 300
+
+# Encrypted file format: SNJENC1 magic + 12-byte nonce + AES-GCM
+# ciphertext (which already includes the 16-byte auth tag).
+ENCRYPTION_MAGIC = b"SNJENC1"
+NONCE_SIZE = 12
 
 # JSON backup: portable export/import of every business table.
 # Parents come first (insert order); restore deletes in reverse.
@@ -46,10 +62,53 @@ JSON_MODELS = [
     StockMovement,
 ]
 
+# Operational tables cleared on restore but never exported: they hold
+# short-lived server state (idempotency keys reference users, so they
+# must be wiped before the users table can be replaced).
+RESTORE_WIPE_MODELS = [IdempotencyKey]
+
 
 def _connection_uri() -> str:
     # pg_dump understands postgresql://, not SQLAlchemy's driver suffix.
     return DATABASE_URL.replace("postgresql+psycopg", "postgresql", 1)
+
+
+def _backup_key() -> bytes | None:
+    """Decoded AES-256 key, or None when encryption is disabled."""
+    if not BACKUP_KEY:
+        return None
+    return base64.b64decode(BACKUP_KEY)
+
+
+def encrypt_bytes(data: bytes) -> bytes:
+    """Encrypt with AES-256-GCM. Returns magic + nonce + ciphertext."""
+    key = _backup_key()
+    if key is None:
+        raise RuntimeError("HISABPRO_BACKUP_KEY is not configured")
+
+    nonce = os.urandom(NONCE_SIZE)
+    ciphertext = AESGCM(key).encrypt(nonce, data, None)
+    return ENCRYPTION_MAGIC + nonce + ciphertext
+
+
+def decrypt_bytes(data: bytes) -> bytes:
+    """Decrypt a file produced by encrypt_bytes. Raises ValueError."""
+    key = _backup_key()
+    if key is None:
+        raise RuntimeError("HISABPRO_BACKUP_KEY is not configured")
+
+    if not data.startswith(ENCRYPTION_MAGIC):
+        raise ValueError("Not an encrypted backup file")
+
+    nonce_start = len(ENCRYPTION_MAGIC)
+    nonce = data[nonce_start : nonce_start + NONCE_SIZE]
+    ciphertext = data[nonce_start + NONCE_SIZE :]
+    try:
+        return AESGCM(key).decrypt(nonce, ciphertext, None)
+    except InvalidTag as exc:
+        raise ValueError(
+            "Decryption failed: wrong key or corrupt file"
+        ) from exc
 
 
 def _safe_path(filename: str) -> Path:
@@ -69,7 +128,7 @@ def _safe_path(filename: str) -> Path:
 
 
 def _safe_json_path(filename: str) -> Path:
-    if not filename.endswith(".json"):
+    if not filename.endswith((".json", ".json.enc")):
         raise HTTPException(status_code=422, detail="Not a JSON backup file")
     return _safe_path(filename)
 
@@ -104,8 +163,11 @@ def list_backups() -> list[dict]:
     if not BACKUP_DIR.exists():
         return []
 
-    paths = list(BACKUP_DIR.glob("*.dump")) + list(
-        BACKUP_DIR.glob("*.json")
+    paths = (
+        list(BACKUP_DIR.glob("*.dump"))
+        + list(BACKUP_DIR.glob("*.json"))
+        + list(BACKUP_DIR.glob("*.dump.enc"))
+        + list(BACKUP_DIR.glob("*.json.enc"))
     )
 
     items = []
@@ -115,7 +177,8 @@ def list_backups() -> list[dict]:
             {
                 "filename": path.name,
                 "size_bytes": stat.st_size,
-                "kind": "json" if path.suffix == ".json" else "pgdump",
+                "kind": "json" if ".json" in path.name else "pgdump",
+                "encrypted": path.name.endswith(".enc"),
                 "created_at": datetime.fromtimestamp(
                     stat.st_mtime, tz=timezone.utc
                 ),
@@ -124,32 +187,92 @@ def list_backups() -> list[dict]:
     return items
 
 
+def prune_old_backups() -> list[str]:
+    """Delete backups beyond the retention window.
+
+    Files older than BACKUP_RETENTION_DAYS are removed, but the newest
+    BACKUP_KEEP_MIN backups are always kept regardless of age. Returns
+    the names of the files that were deleted.
+    """
+    if not BACKUP_DIR.exists():
+        return []
+
+    paths = [p for p in BACKUP_DIR.iterdir() if p.is_file()]
+    paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    now = datetime.now(timezone.utc).timestamp()
+    cutoff = now - (BACKUP_RETENTION_DAYS * 86400)
+
+    deleted: list[str] = []
+    for index, path in enumerate(paths):
+        # Always keep the newest BACKUP_KEEP_MIN backups.
+        if index < BACKUP_KEEP_MIN:
+            continue
+        if path.stat().st_mtime >= cutoff:
+            continue
+        try:
+            path.unlink()
+            deleted.append(path.name)
+        except OSError:
+            # A file that cannot be removed is left for manual cleanup.
+            continue
+
+    return deleted
+
+
 def create_backup() -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
-    filename = (
-        f"hisabpro-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.dump"
-    )
+    timestamp = f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
+    key = _backup_key()
+    extension = ".dump.enc" if key else ".dump"
+    filename = f"hisabpro-{timestamp}{extension}"
     destination = BACKUP_DIR / filename
 
-    _run(
-        [
-            "pg_dump",
-            "--format=custom",
-            "--no-owner",
-            "--file",
-            str(destination),
-            _connection_uri(),
-        ]
-    )
+    if key:
+        # Dump to a private temp file, encrypt, then move into place so
+        # the plaintext dump never lands in the backups folder.
+        with tempfile.NamedTemporaryFile(
+            suffix=".dump", delete=False
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+
+        try:
+            _run(
+                [
+                    "pg_dump",
+                    "--format=custom",
+                    "--no-owner",
+                    "--file",
+                    str(tmp_path),
+                    _connection_uri(),
+                ]
+            )
+            destination.write_bytes(encrypt_bytes(tmp_path.read_bytes()))
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    else:
+        _run(
+            [
+                "pg_dump",
+                "--format=custom",
+                "--no-owner",
+                "--file",
+                str(destination),
+                _connection_uri(),
+            ]
+        )
 
     stat = destination.stat()
+    pruned = prune_old_backups()
 
     return {
         "filename": filename,
         "size_bytes": stat.st_size,
         "kind": "pgdump",
+        "encrypted": key is not None,
         "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+        "pruned": pruned,
     }
 
 
@@ -164,17 +287,47 @@ def restore_backup(filename: str, confirm: str) -> dict:
 
     # --clean drops existing objects before restoring, so this
     # overwrites the current database. The confirm flag is mandatory.
-    _run(
-        [
-            "pg_restore",
-            "--clean",
-            "--if-exists",
-            "--no-owner",
-            "--dbname",
-            _connection_uri(),
-            str(path),
-        ]
-    )
+    if filename.endswith(".enc"):
+        try:
+            dump_bytes = decrypt_bytes(path.read_bytes())
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Backup could not be decrypted (wrong key or corrupt file)",
+            ) from exc
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".dump", delete=False
+        ) as tmp:
+            tmp.write(dump_bytes)
+            tmp_path = Path(tmp.name)
+
+        try:
+            _run(
+                [
+                    "pg_restore",
+                    "--clean",
+                    "--if-exists",
+                    "--no-owner",
+                    "--dbname",
+                    _connection_uri(),
+                    str(tmp_path),
+                ]
+            )
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    else:
+        _run(
+            [
+                "pg_restore",
+                "--clean",
+                "--if-exists",
+                "--no-owner",
+                "--dbname",
+                _connection_uri(),
+                str(path),
+            ]
+        )
 
     return {
         "filename": filename,
@@ -245,23 +398,30 @@ def create_json_backup(db: Session) -> dict:
         "data": data,
     }
 
+    key = _backup_key()
+    extension = ".json.enc" if key else ".json"
     filename = (
-        f"snj-gold-lab-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.json"
+        f"snj-gold-lab-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}{extension}"
     )
     destination = BACKUP_DIR / filename
-    destination.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+
+    raw = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
+    if key:
+        destination.write_bytes(encrypt_bytes(raw))
+    else:
+        destination.write_text(raw.decode("utf-8"), encoding="utf-8")
 
     stat = destination.stat()
+    pruned = prune_old_backups()
 
     return {
         "filename": filename,
         "size_bytes": stat.st_size,
         "kind": "json",
+        "encrypted": key is not None,
         "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         "counts": counts,
+        "pruned": pruned,
     }
 
 
@@ -281,8 +441,21 @@ def restore_json_backup(db: Session, filename: str, confirm: str) -> dict:
     path = _safe_json_path(filename)
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        if filename.endswith(".enc"):
+            try:
+                raw = decrypt_bytes(path.read_bytes()).decode("utf-8")
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Backup could not be decrypted "
+                    "(wrong key or corrupt file)",
+                ) from exc
+        else:
+            raw = path.read_text(encoding="utf-8")
+        payload = json.loads(raw)
+    except HTTPException:
+        raise
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise HTTPException(
             status_code=500,
             detail="Backup file could not be read as JSON",
@@ -308,7 +481,11 @@ def restore_json_backup(db: Session, filename: str, confirm: str) -> dict:
     counts: dict[str, int] = {}
 
     try:
-        # Children first so foreign keys never block the wipe.
+        # Operational tables first (they reference business rows), then
+        # children-first for the business tables so foreign keys never
+        # block the wipe.
+        for model in RESTORE_WIPE_MODELS:
+            db.execute(delete(model))
         for model in reversed(JSON_MODELS):
             db.execute(delete(model))
         # Push the deletes to the database and drop the old rows from the

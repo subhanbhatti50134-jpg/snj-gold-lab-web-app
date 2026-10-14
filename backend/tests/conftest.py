@@ -27,6 +27,9 @@ os.environ["JWT_SECRET_KEY"] = "test-only-jwt-secret-key-not-for-production"
 os.environ["HISABPRO_LOGIN_RATE_LIMIT"] = "0"
 # Keep test backups out of the real backup folder.
 os.environ["HISABPRO_BACKUP_DIR"] = "/tmp/hisabpro-test-backups"
+# Default to plaintext backups in tests so existing assertions hold.
+# Encryption tests monkeypatch app.services.backup.BACKUP_KEY explicitly.
+os.environ["HISABPRO_BACKUP_KEY"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

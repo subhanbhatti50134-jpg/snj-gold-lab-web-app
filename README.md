@@ -116,6 +116,42 @@ Start the API:
 - Never commit `.env` or database dumps; backups live in `backups/`
   (gitignored).
 
+### Backups, encryption and retention
+
+Backups are created from **Settings → Database backups** (admin only).
+Two kinds exist: **JSON data** (portable, all business tables) and
+**pg_dump** (full database, PostgreSQL only).
+
+**Encryption at rest.** Set `HISABPRO_BACKUP_KEY` in `.env` to enable
+AES-256-GCM encryption. New backups are then written as `*.json.enc` /
+`*.dump.enc`; old plaintext backups stay restorable. The key is never
+committed — generate and store it separately (password manager, printed
+copy in a safe):
+
+```bash
+python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+```
+
+**Retention.** After each backup, files older than
+`HISABPRO_BACKUP_RETENTION_DAYS` (default 30) are pruned, but the newest
+`HISABPRO_BACKUP_KEEP_MIN` (default 5) backups are always kept. Every
+pruned file is written to the audit log.
+
+**Scheduled backups (cron).** The app does not run a scheduler. For a
+daily automated backup, add a cron job on the server (adjust the token
+or use a service account):
+
+```cron
+# Every day at 02:00 — JSON backup via the API
+0 2 * * * TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"REDACTED"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])") && curl -s -X POST http://127.0.0.1:8000/api/backups/json -H "Authorization: Bearer $TOKEN"
+```
+
+**Restore drill.** Before trusting a backup, test it: create a backup,
+then restore it on a staging copy (never over production without an
+explicit confirmation). The automated test suite includes a full
+restore-drill that verifies row counts and decimal amounts survive the
+round trip.
+
 ## 3. Frontend
 
 ```bash

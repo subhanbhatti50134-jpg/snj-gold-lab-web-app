@@ -103,6 +103,7 @@ export interface BackupInfo {
   filename: string;
   size_bytes: number;
   kind: "pgdump" | "json";
+  encrypted: boolean;
   created_at: string;
 }
 

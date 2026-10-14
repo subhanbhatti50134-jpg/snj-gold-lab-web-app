@@ -1,4 +1,5 @@
 
+import base64
 import os
 from pathlib import Path
 
@@ -10,6 +11,17 @@ load_dotenv(ROOT_DIR / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 API_KEY = os.getenv("HISABPRO_API_KEY", "")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+
+# Optional: base64-encoded 32-byte AES-256 key. When set, new backups
+# are encrypted at rest (*.json.enc / *.dump.enc). When unset, backups
+# stay plaintext (development convenience). Generate with:
+#   python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+BACKUP_KEY = os.getenv("HISABPRO_BACKUP_KEY", "")
+
+# Backups older than this many days are pruned after each new backup,
+# but the newest BACKUP_KEEP_MIN files are always kept.
+BACKUP_RETENTION_DAYS = int(os.getenv("HISABPRO_BACKUP_RETENTION_DAYS", "30"))
+BACKUP_KEEP_MIN = int(os.getenv("HISABPRO_BACKUP_KEEP_MIN", "5"))
 
 # Comma-separated browser origins allowed to call the API.
 CORS_ORIGINS = [
@@ -43,3 +55,20 @@ if len(JWT_SECRET_KEY) < 32:
 # Production (docker-compose sets this to false) must use Alembic
 # migrations only so the schema is always migration-controlled.
 AUTO_CREATE_TABLES = os.getenv("HISABPRO_AUTO_CREATE_TABLES", "true").lower() in {"1", "true", "yes"}
+
+if BACKUP_KEY:
+    try:
+        decoded_key = base64.b64decode(BACKUP_KEY, validate=True)
+    except Exception as exc:
+        raise RuntimeError(
+            "HISABPRO_BACKUP_KEY must be valid base64. "
+            'Generate one with: python -c "import base64,secrets; '
+            'print(base64.b64encode(secrets.token_bytes(32)).decode())"'
+        ) from exc
+
+    if len(decoded_key) != 32:
+        raise RuntimeError(
+            "HISABPRO_BACKUP_KEY must decode to exactly 32 bytes "
+            "(AES-256). Generate one with: python -c \"import base64,secrets; "
+            "print(base64.b64encode(secrets.token_bytes(32)).decode())\""
+        )
