@@ -9,7 +9,7 @@ from app.services.audit import log_audit
 # cannot silently create a setting nobody reads.
 DEFAULTS: dict[str, str] = {
     # Business profile (shown on printed reports and receipts)
-    "business_name": "SNJ Gold Lab",
+    "business_name": "Saleem Nadeem Jewellers",
     "business_phone": "",
     "business_address": "",
     "currency": "PKR",

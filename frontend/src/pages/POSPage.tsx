@@ -10,10 +10,11 @@ import {
   type CartLine
 } from "../pos";
 import type { InventoryRow, MetalRate, Party, Product } from "../types";
+import ReceiptModal from "../ReceiptModal";
 import { Empty, Field, Modal, PanelHeading } from "../ui";
 
 interface CheckoutResult {
-  references: string[];
+  sales: { id: number; reference: string }[];
   total: number;
   paid: number;
   change: number;
@@ -52,6 +53,7 @@ export default function POSPage({
   const [notes, setNotes] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [result, setResult] = useState<CheckoutResult | null>(null);
+  const [receiptId, setReceiptId] = useState<number | null>(null);
 
   // The same key is reused if a checkout fails and is retried, so the
   // server records the sale only once. Cleared after a success.
@@ -186,14 +188,17 @@ export default function POSPage({
       if (!checkoutKeyRef.current) {
         checkoutKeyRef.current = newIdempotencyKey();
       }
-      const rows = await api<{ reference: string }[]>("/api/sales/batch", {
-        method: "POST",
-        body: JSON.stringify({ items }),
-        idempotencyKey: checkoutKeyRef.current
-      });
+      const rows = await api<{ id: number; reference: string }[]>(
+        "/api/sales/batch",
+        {
+          method: "POST",
+          body: JSON.stringify({ items }),
+          idempotencyKey: checkoutKeyRef.current
+        }
+      );
       checkoutKeyRef.current = "";
       setResult({
-        references: rows.map(r => r.reference),
+        sales: rows.map(r => ({ id: r.id, reference: r.reference })),
         total,
         paid: allocation.totalPaid,
         change: allocation.change,
@@ -489,9 +494,24 @@ export default function POSPage({
           onClose={() => setResult(null)}
         >
           <ul style={{ margin: "8px 0", paddingLeft: 20 }}>
-            {result.references.map(ref => (
-              <li key={ref}>
-                <b>{ref}</b>
+            {result.sales.map(sale => (
+              <li
+                key={sale.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12
+                }}
+              >
+                <b>{sale.reference}</b>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setReceiptId(sale.id)}
+                >
+                  Receipt
+                </button>
               </li>
             ))}
           </ul>
@@ -510,6 +530,13 @@ export default function POSPage({
             </button>
           </div>
         </Modal>
+      )}
+
+      {receiptId !== null && (
+        <ReceiptModal
+          transactionId={receiptId}
+          onClose={() => setReceiptId(null)}
+        />
       )}
     </>
   );

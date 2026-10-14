@@ -83,3 +83,37 @@ class SaleBatchCreate(BaseModel):
     """POS checkout: several sales created in one atomic batch."""
 
     items: list[TransactionCreate] = Field(min_length=1, max_length=50)
+
+
+class PaymentRow(BaseModel):
+    id: int
+    amount: Decimal
+    method: str
+    note: str
+    recorded_by: str
+    paid_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BusinessHeader(BaseModel):
+    """Shop identity printed at the top of a receipt."""
+
+    name: str
+    address: str
+    phone: str
+    currency: str
+    receipt_note: str
+
+
+class TransactionDetailOut(TransactionOut):
+    """Everything one bill needs for a printable receipt."""
+
+    product_name: str = ""
+    product_sku: str = ""
+    paid_total: Decimal = Decimal("0")
+    due_amount: Decimal = Decimal("0")
+    payments: list[PaymentRow] = []
+    business: BusinessHeader = BusinessHeader(
+        name="", address="", phone="", currency="", receipt_note=""
+    )

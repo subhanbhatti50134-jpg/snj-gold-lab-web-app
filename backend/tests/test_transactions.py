@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from helpers import login_headers
 from test_api import create_product, transaction_payload
@@ -70,3 +71,68 @@ def test_transaction_history_rejects_invalid_date_range(client):
     )
 
     assert response.status_code == 422
+
+
+def test_transaction_detail_requires_login(client):
+    assert client.get("/api/transactions/1").status_code == 401
+
+
+def test_transaction_detail_not_found(client):
+    response = client.get("/api/transactions/999999", headers=login_headers(client, "viewer"))
+    assert response.status_code == 404
+
+
+def test_transaction_detail_includes_receipt_data(client):
+    product = create_product(client)
+    purchase = client.post(
+        "/api/purchases",
+        headers=login_headers(client, "operator"),
+        json=transaction_payload(product["id"], weight=10, rate=100, amount_paid=400),
+    )
+    assert purchase.status_code == 201, purchase.text
+
+    response = client.get(
+        f"/api/transactions/{purchase.json()['id']}",
+        headers=login_headers(client, "viewer"),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["product_name"] == product["name"]
+    assert body["product_sku"] == product["sku"]
+    assert Decimal(str(body["paid_total"])) == Decimal("400")
+    assert Decimal(str(body["due_amount"])) == Decimal("600")
+    assert len(body["payments"]) == 1
+    assert Decimal(str(body["payments"][0]["amount"])) == Decimal("400")
+    assert body["business"]["name"] == "Saleem Nadeem Jewellers"
+    assert "currency" in body["business"]
+
+
+def test_transaction_detail_tracks_later_payments(client):
+    product = create_product(client)
+    create_purchase(client, product["id"], 5)
+    sale = client.post(
+        "/api/sales",
+        headers=login_headers(client, "operator"),
+        json=transaction_payload(product["id"], weight=5, rate=100, amount_paid=100),
+    )
+    assert sale.status_code == 201, sale.text
+    sale_id = sale.json()["id"]
+
+    pay = client.post(
+        f"/api/transactions/{sale_id}/payments",
+        headers=login_headers(client, "operator"),
+        json={"amount": 250, "method": "cash", "note": "part payment"},
+    )
+    assert pay.status_code == 201, pay.text
+
+    response = client.get(
+        f"/api/transactions/{sale_id}",
+        headers=login_headers(client, "viewer"),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert Decimal(str(body["paid_total"])) == Decimal("350")
+    assert Decimal(str(body["due_amount"])) == Decimal("150")
+    assert len(body["payments"]) == 2

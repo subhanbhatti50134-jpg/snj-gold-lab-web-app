@@ -8,6 +8,7 @@ import {
   type CurrentUser
 } from "../api";
 import type {Payment, Product, Transaction} from "../types";
+import ReceiptModal from "../ReceiptModal";
 import {
   Empty,
   Field,
@@ -48,6 +49,7 @@ export default function TransactionsPage({
   const [payMethod, setPayMethod] = useState("cash");
   const [payNote, setPayNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [receiptId, setReceiptId] = useState<number | null>(null);
 
   // Reused if a payment submit fails and is retried, so the server
   // records the payment only once. Cleared after a success.
@@ -214,6 +216,12 @@ export default function TransactionsPage({
 
             return (
               <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  className="text-button"
+                  onClick={() => setReceiptId(row.id)}
+                >
+                  Receipt
+                </button>
                 {canOperate && due > 0 && row.status === "active" && (
                   <button
                     className="text-button"
@@ -383,6 +391,13 @@ export default function TransactionsPage({
               </form>
             )}
         </Modal>
+      )}
+
+      {receiptId !== null && (
+        <ReceiptModal
+          transactionId={receiptId}
+          onClose={() => setReceiptId(null)}
+        />
       )}
     </section>
   );

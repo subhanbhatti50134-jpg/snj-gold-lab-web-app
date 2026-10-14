@@ -225,6 +225,37 @@ tbody tr:hover { background: #fcfdff; }
 /* Danger text button */
 .text-button.danger { color: #c05640; }
 
+/* ---- Bill receipt (printable) ---- */
+.receipt {
+  max-width: 340px; margin: 0 auto 14px; padding: 16px;
+  border: 1px dashed #c9d2de; border-radius: 8px; background: #fff; color: #1c2b40;
+}
+.receipt-header { text-align: center; padding-bottom: 8px; border-bottom: 2px solid #142438; }
+.receipt-header h2 { margin: 0; font: 800 16px Manrope,sans-serif; letter-spacing: .5px; text-transform: uppercase; }
+.receipt-header p { margin: 4px 0 0; font-size: 10px; color: #526176; }
+.receipt-title {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+}
+.receipt-cancelled {
+  color: #c05640; border: 1.5px solid #c05640; border-radius: 4px;
+  padding: 2px 6px; font-size: 9px; font-weight: 800; transform: rotate(-6deg);
+}
+.receipt-table { width: 100%; border-collapse: collapse; white-space: normal; font-size: 10px; }
+.receipt-table td { padding: 3px 0; border: 0; color: #526176; white-space: normal; }
+.receipt-table td:last-child { text-align: right; color: #1c2b40; font-weight: 600; word-break: break-word; }
+.receipt-totals { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #c9d2de; }
+.receipt-totals div { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+.receipt-totals .due b { color: #bd793b; }
+.receipt-payments { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #c9d2de; font-size: 10px; }
+.receipt-payments b { display: block; margin-bottom: 4px; }
+.receipt-payments div { display: flex; justify-content: space-between; color: #526176; padding: 2px 0; }
+.receipt-footer {
+  margin-top: 10px; padding-top: 8px; border-top: 2px solid #142438;
+  text-align: center; font-size: 10px; color: #526176; font-style: italic;
+}
+.receipt-cancel-note { margin-top: 6px; font-size: 9px; color: #c05640; text-align: center; }
+
 /* Extra transaction kind badges */
 .kind.sales_return { background: #fdeeea; color: #c05640; }
 .kind.stock_adjustment { background: #eef1f6; color: #5c6b81; }
@@ -326,5 +357,33 @@ tbody tr:hover { background: #fcfdff; }
 
   h3 {
     break-after: avoid;
+  }
+
+  /* Bill receipt: print only the receipt, hide the app behind it.
+     body.receipt-mode is added by ReceiptModal while it is open. */
+  body.receipt-mode .app-shell {
+    display: none !important;
+  }
+
+  body.receipt-mode .modal-backdrop {
+    position: static; display: block; padding: 0; background: none; overflow: visible;
+  }
+
+  body.receipt-mode .modal {
+    width: 100%; max-width: none; max-height: none; overflow: visible;
+    padding: 0; border-radius: 0; box-shadow: none;
+  }
+
+  body.receipt-mode .modal-heading,
+  body.receipt-mode .receipt-actions {
+    display: none !important;
+  }
+
+  .receipt {
+    max-width: 100%; border: 0; margin: 0;
+  }
+
+  .receipt-header h2 {
+    font-size: 22px;
   }
 }

@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,12 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import MANAGE_ROLES, READ_ROLES, require_roles
 from app.db.session import get_db
+from app.models.payments import Payment
 from app.models.product import Product
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.movements import TransactionCancel
-from app.schemas.transaction import TransactionOut
+from app.schemas.transaction import BusinessHeader, TransactionDetailOut, TransactionOut
 from app.services.reversals import cancel_transaction
+from app.services.settings import get_settings
 
 router = APIRouter(
     prefix="/api/transactions",
@@ -87,6 +90,49 @@ def get_transactions(
         .limit(limit)
         .all()
     )
+
+
+@router.get(
+    "/{transaction_id}",
+    response_model=TransactionDetailOut,
+    dependencies=[Depends(require_roles(*READ_ROLES))],
+)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+):
+    """Single bill with product name, payment ledger and shop header —
+    the data a printed receipt needs."""
+    transaction = db.get(Transaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(
+            status_code=404, detail="Transaction not found"
+        )
+
+    product = db.get(Product, transaction.product_id)
+    payments = (
+        db.query(Payment)
+        .filter(Payment.transaction_id == transaction_id)
+        .order_by(Payment.paid_at.asc(), Payment.id.asc())
+        .all()
+    )
+    paid_total = sum((p.amount for p in payments), Decimal("0"))
+
+    settings = get_settings(db)
+    detail = TransactionDetailOut.model_validate(transaction)
+    detail.product_name = product.name if product else ""
+    detail.product_sku = product.sku if product else ""
+    detail.payments = payments
+    detail.paid_total = paid_total
+    detail.due_amount = transaction.total_amount - paid_total
+    detail.business = BusinessHeader(
+        name=settings["business_name"],
+        address=settings["business_address"],
+        phone=settings["business_phone"],
+        currency=settings["currency"],
+        receipt_note=settings["receipt_note"],
+    )
+    return detail
 
 
 @router.post(
