@@ -85,6 +85,26 @@ export interface Party {
   net: number | string;
 }
 
+export interface LayawayOrder {
+  id: number;
+  reference: string;
+  party_id: number | null;
+  party_name: string;
+  description: string;
+  estimated_weight_grams: number | string;
+  agreed_rate_per_gram: number | string;
+  estimated_total: number | string;
+  advance_amount: number | string;
+  balance: number | string;
+  status: "pending" | "delivered" | "cancelled";
+  due_date: string | null;
+  notes: string;
+  sale_id: number | null;
+  created_by: string;
+  created_at: string | null;
+  delivered_at: string | null;
+}
+
 export interface AuditEntry {
   id: number;
   username: string;

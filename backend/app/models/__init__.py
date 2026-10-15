@@ -2,6 +2,7 @@
 from app.models.audit import AuditLog
 from app.models.idempotency import IdempotencyKey
 from app.models.metal_rate import MetalRate
+from app.models.order import LayawayOrder
 from app.models.party import Party
 from app.models.payments import Payment
 from app.models.product import Product
@@ -21,4 +22,5 @@ __all__ = [
     "AuditLog",
     "Setting",
     "IdempotencyKey",
+    "LayawayOrder",
 ]

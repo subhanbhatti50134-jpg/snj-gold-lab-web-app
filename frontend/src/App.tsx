@@ -10,6 +10,7 @@ import {
   Boxes,
   ClipboardList,
   Coins,
+  HandCoins,
   History,
   LayoutDashboard,
   LogOut,
@@ -45,6 +46,7 @@ import POSPage from "./pages/POSPage";
 import PurchaseSalePage from "./pages/PurchaseSalePage";
 import TransactionsPage from "./pages/TransactionsPage";
 import PartiesPage from "./pages/PartiesPage";
+import OrdersPage from "./pages/OrdersPage";
 import MovementsPage from "./pages/MovementsPage";
 import ReportsPage from "./pages/ReportsPage";
 import AuditPage from "./pages/AuditPage";
@@ -59,6 +61,7 @@ type Page =
   | "Inventory"
   | "Purchases"
   | "Sales"
+  | "Bayana Orders"
   | "Transactions"
   | "Parties"
   | "Stock Movements"
@@ -75,6 +78,7 @@ const NAV: { label: Page; icon: typeof LayoutDashboard; min: "viewer" | "operato
   { label: "Inventory", icon: Boxes, min: "viewer" },
   { label: "Purchases", icon: ShoppingCart, min: "operator" },
   { label: "Sales", icon: ShoppingBag, min: "operator" },
+  { label: "Bayana Orders", icon: HandCoins, min: "viewer" },
   { label: "Transactions", icon: ArrowLeftRight, min: "viewer" },
   { label: "Parties", icon: Users, min: "viewer" },
   { label: "Stock Movements", icon: ClipboardList, min: "manager" },
@@ -474,6 +478,15 @@ function PageBody({
           notice={notice}
           refreshKey={refreshKey}
           goTo={goTo}
+        />
+      );
+    case "Bayana Orders":
+      return (
+        <OrdersPage
+          user={user}
+          fail={fail}
+          notice={notice}
+          refreshKey={refreshKey}
         />
       );
     case "Transactions":
