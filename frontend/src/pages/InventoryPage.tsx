@@ -6,7 +6,8 @@ import {
   type CurrentUser
 } from "../api";
 import type { AppSettings, InventoryRow, Product } from "../types";
-import { Empty, Field, MetalTag, Modal, PanelHeading } from "../ui";
+import { formatPurity, fromKarat, toKarat } from "../purity";
+import { Empty, Field, MetalTag, Modal, PanelHeading, PurityField } from "../ui";
 
 export default function InventoryPage({
   user,
@@ -44,6 +45,7 @@ export default function InventoryPage({
   });
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [purityUnit, setPurityUnit] = useState<"%" | "K">("K");
   const [editForm, setEditForm] = useState({
     name: "",
     sku: "",
@@ -134,7 +136,10 @@ export default function InventoryPage({
     setEditForm({
       name: product.name,
       sku: product.sku,
-      purity: String(product.purity),
+      purity:
+        purityUnit === "K"
+          ? String(toKarat(product.purity))
+          : String(product.purity),
       active: product.active
     });
     setEditProduct(product);
@@ -227,7 +232,10 @@ export default function InventoryPage({
   async function submitEdit(e: FormEvent) {
     e.preventDefault();
     if (!editProduct) return;
-    const purity = Number(editForm.purity);
+    const purity =
+      purityUnit === "K"
+        ? fromKarat(editForm.purity)
+        : Number(editForm.purity);
     if (!editForm.name.trim() || !editForm.sku.trim()) {
       fail("Name aur SKU zaroori hain.");
       return;
@@ -340,7 +348,7 @@ export default function InventoryPage({
                   <td>
                     <MetalTag metal={product?.metal || "other"} />
                   </td>
-                  <td>{product ? `${product.purity}%` : "—"}</td>
+                  <td>{product ? formatPurity(product.purity) : "—"}</td>
                   {(canOperate || canManage) && (
                     <td>
                       <div style={{ display: "flex", gap: 10 }}>
@@ -583,19 +591,12 @@ export default function InventoryPage({
                 onChange={e => setEditForm({ ...editForm, sku: e.target.value })}
               />
             </Field>
-            <Field label="Purity %">
-              <input
-                type="number"
-                step="any"
-                min="0"
-                max="100"
-                required
-                value={editForm.purity}
-                onChange={e =>
-                  setEditForm({ ...editForm, purity: e.target.value })
-                }
-              />
-            </Field>
+            <PurityField
+              value={editForm.purity}
+              onChange={v => setEditForm({ ...editForm, purity: v })}
+              unit={purityUnit}
+              onUnitChange={setPurityUnit}
+            />
             <label
               style={{
                 display: "flex",
@@ -639,7 +640,7 @@ export default function InventoryPage({
         >
           <form className="form-grid modal-form" onSubmit={submitDelete}>
             <p className="hint">
-              {deleteProduct.sku} · {deleteProduct.purity}%
+              {deleteProduct.sku} · {formatPurity(deleteProduct.purity)}
             </p>
             <p className="hint">
               Agar is product par koi transaction ya stock movement hai to

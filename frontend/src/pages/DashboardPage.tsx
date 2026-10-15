@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { api, money, qty, type CurrentUser } from "../api";
 import type {DashboardData, Product} from "../types";
+import { formatPurity } from "../purity";
 import { Empty, Metric, PanelHeading, TransactionTable } from "../ui";
 
 const GRAMS_PER_TOLA = 11.6638;
@@ -135,7 +136,7 @@ export default function DashboardPage({
               ? money(Number(gold.rate_per_gram) * GRAMS_PER_TOLA)
               : "Not set"
           }
-          foot={gold ? `${qty(gold.purity)}% purity · verified` : "Add a rate"}
+          foot={gold ? `${formatPurity(gold.purity)} · verified` : "Add a rate"}
         />
         <Metric
           icon={<Boxes size={19} />}

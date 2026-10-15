@@ -3,7 +3,8 @@ import { Plus } from "lucide-react";
 import { api, money, newIdempotencyKey, type CurrentUser } from "../api";
 import type { MakingChargeType } from "../pos";
 import type {MetalRate, Party, Product, RateUnit} from "../types";
-import { Field } from "../ui";
+import { fromKarat, toKarat } from "../purity";
+import { Field, PurityField } from "../ui";
 
 const GRAMS_PER_TOLA = 11.6638;
 
@@ -21,7 +22,7 @@ const blank = (location: string) => ({
   gross_weight_grams: "",
   net_weight_grams: "",
   deduction_grams: "0",
-  purity: "99.99",
+  purity: "24",
   rate_per_gram: "",
   rate_unit: "tola" as RateUnit,
   charges: "0",
@@ -53,6 +54,7 @@ export default function PurchaseSalePage({
   const [parties, setParties] = useState<Party[]>([]);
   const [rates, setRates] = useState<MetalRate[]>([]);
   const [form, setForm] = useState(blank("Main Store"));
+  const [purityUnit, setPurityUnit] = useState<"%" | "K">("K");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -129,7 +131,10 @@ export default function PurchaseSalePage({
   const net = Number(form.net_weight_grams || 0);
   const rate = Number(form.rate_per_gram || suggestedRate || 0);
   const charges = Number(form.charges || 0);
-  const purity = Number(form.purity || 0);
+  const purity =
+    purityUnit === "K"
+      ? fromKarat(form.purity)
+      : Number(form.purity || 0);
 
   const factor =
     form.rate_unit === "tola"
@@ -258,7 +263,11 @@ export default function PurchaseSalePage({
               setForm({
                 ...form,
                 product_id: e.target.value,
-                purity: product ? String(product.purity) : form.purity
+                purity: product
+                  ? purityUnit === "K"
+                    ? String(toKarat(product.purity))
+                    : String(product.purity)
+                  : form.purity
               });
             }}
           >
@@ -338,17 +347,12 @@ export default function PurchaseSalePage({
           />
         </Field>
 
-        <Field label="Purity (%)">
-          <input
-            required
-            type="number"
-            min="0.01"
-            max="100"
-            step="0.01"
-            value={form.purity}
-            onChange={e => setForm({ ...form, purity: e.target.value })}
-          />
-        </Field>
+        <PurityField
+          value={form.purity}
+          onChange={v => setForm({ ...form, purity: v })}
+          unit={purityUnit}
+          onUnitChange={setPurityUnit}
+        />
 
         <Field
           label={

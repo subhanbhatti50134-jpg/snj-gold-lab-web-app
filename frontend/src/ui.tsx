@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Boxes, Search, X } from "lucide-react";
 import type { Product } from "./types";
 import { money, qty } from "./api";
+import { fromKarat, prettyKarat, toKarat, type PurityUnit } from "./purity";
 
 export function Field({
   label,
@@ -15,6 +16,74 @@ export function Field({
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+export function PurityField({
+  value,
+  onChange,
+  unit,
+  onUnitChange
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  unit: PurityUnit;
+  onUnitChange: (unit: PurityUnit) => void;
+}) {
+  const n = Number(value);
+  const hint =
+    unit === "K"
+      ? Number.isFinite(n)
+        ? `= ${fromKarat(n)}%`
+        : ""
+      : Number.isFinite(n) && n > 0
+        ? `= ${prettyKarat(n)}`
+        : "";
+
+  function switchUnit(next: PurityUnit) {
+    if (next === unit) return;
+    const current = Number(value);
+    if (value !== "" && Number.isFinite(current)) {
+      onChange(
+        String(next === "K" ? toKarat(current) : fromKarat(current))
+      );
+    }
+    onUnitChange(next);
+  }
+
+  return (
+    <Field label={unit === "K" ? "Purity (karat)" : "Purity (%)"}>
+      <div className="purity-row">
+        <input
+          required
+          type="number"
+          min="0"
+          max={unit === "K" ? "24" : "100"}
+          step={unit === "K" ? "0.1" : "0.01"}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        />
+        <div className="unit-toggle">
+          <button
+            type="button"
+            className={unit === "%" ? "on" : ""}
+            onClick={() => switchUnit("%")}
+            aria-label="Purity in percent"
+          >
+            %
+          </button>
+          <button
+            type="button"
+            className={unit === "K" ? "on" : ""}
+            onClick={() => switchUnit("K")}
+            aria-label="Purity in karat"
+          >
+            K
+          </button>
+        </div>
+      </div>
+      {hint && <small className="hint">{hint}</small>}
+    </Field>
   );
 }
 

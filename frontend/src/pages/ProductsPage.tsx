@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, atLeast, type CurrentUser } from "../api";
+import { formatPurity, fromKarat } from "../purity";
 import type {Product} from "../types";
-import { Empty, Field, MetalTag, Modal, PanelHeading, Status, pretty } from "../ui";
+import { Empty, Field, MetalTag, Modal, PanelHeading, PurityField, Status, pretty } from "../ui";
 
 const CATEGORIES = [
   ["loose_metal", "Loose metal"],
@@ -22,7 +23,7 @@ const blank = {
   name: "",
   category: "loose_metal",
   metal: "gold",
-  purity: "99.99"
+  purity: "24"
 };
 
 export default function ProductsPage({
@@ -44,6 +45,7 @@ export default function ProductsPage({
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [purityUnit, setPurityUnit] = useState<"%" | "K">("K");
 
   const canManage = atLeast(user, "manager");
 
@@ -81,7 +83,10 @@ export default function ProductsPage({
     try {
       await api("/api/products", {
         method: "POST",
-        body: JSON.stringify({ ...form, purity: Number(form.purity) })
+        body: JSON.stringify({
+          ...form,
+          purity: purityUnit === "K" ? fromKarat(form.purity) : Number(form.purity)
+        })
       });
       notice("Product save ho gaya.");
       setShowForm(false);
@@ -183,7 +188,7 @@ export default function ProductsPage({
                 <td>
                   <MetalTag metal={p.metal} />
                 </td>
-                <td>{p.purity}%</td>
+                <td>{formatPurity(p.purity)}</td>
                 <td>
                   <Status active={p.active} />
                 </td>
@@ -258,17 +263,12 @@ export default function ProductsPage({
                 ))}
               </select>
             </Field>
-            <Field label="Purity (%)">
-              <input
-                required
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={form.purity}
-                onChange={e => setForm({ ...form, purity: e.target.value })}
-              />
-            </Field>
+            <PurityField
+              value={form.purity}
+              onChange={v => setForm({ ...form, purity: v })}
+              unit={purityUnit}
+              onUnitChange={setPurityUnit}
+            />
             <div className="form-actions">
               <button
                 type="button"
@@ -294,7 +294,7 @@ export default function ProductsPage({
           <form className="form-grid modal-form" onSubmit={submitDelete}>
             <p className="hint">
               {deleteTarget.sku} · {pretty(deleteTarget.metal)} ·{" "}
-              {deleteTarget.purity}%
+              {formatPurity(deleteTarget.purity)}
             </p>
             <p className="hint">
               Agar is product par koi transaction ya stock movement hai to

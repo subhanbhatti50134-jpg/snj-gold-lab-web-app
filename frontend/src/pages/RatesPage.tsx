@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, atLeast, money, qty, type CurrentUser } from "../api";
 import type {MetalRate, RateUnit} from "../types";
-import { Empty, Field, MetalTag, Modal, PanelHeading, Status } from "../ui";
+import { formatPurity, fromKarat } from "../purity";
+import { Empty, Field, MetalTag, Modal, PanelHeading, PurityField, Status } from "../ui";
 
 const GRAMS_PER_TOLA = 11.6638;
 
@@ -14,7 +15,7 @@ const UNITS: { value: RateUnit; label: string; factor: number }[] = [
 
 const blank = {
   metal: "gold",
-  purity: "99.99",
+  purity: "24",
   rate_per_gram: "",
   unit: "tola" as RateUnit,
   source_note: "Manually verified",
@@ -37,6 +38,7 @@ export default function RatesPage({
   const [search, setSearch] = useState("");
   const [includeHistory, setIncludeHistory] = useState(false);
   const [form, setForm] = useState({ ...blank, verified_by: user.username });
+  const [purityUnit, setPurityUnit] = useState<"%" | "K">("K");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -87,7 +89,10 @@ export default function RatesPage({
         method: "POST",
         body: JSON.stringify({
           metal: form.metal,
-          purity: Number(form.purity),
+          purity:
+            purityUnit === "K"
+              ? fromKarat(form.purity)
+              : Number(form.purity),
           rate_per_gram: Number(form.rate_per_gram),
           unit: form.unit,
           source_note: form.source_note,
@@ -112,7 +117,7 @@ export default function RatesPage({
           <strong>{perTola(gold)}</strong>
           <small>
             {gold
-              ? `${qty(gold.purity)}% purity · entered as ${qty(gold.entered_rate)} per ${gold.unit}`
+              ? `${formatPurity(gold.purity)} purity · entered as ${qty(gold.entered_rate)} per ${gold.unit}`
               : "Add a verified rate to begin"}
           </small>
         </article>
@@ -121,7 +126,7 @@ export default function RatesPage({
           <strong>{perTola(silver)}</strong>
           <small>
             {silver
-              ? `${qty(silver.purity)}% purity · entered as ${qty(silver.entered_rate)} per ${silver.unit}`
+              ? `${formatPurity(silver.purity)} purity · entered as ${qty(silver.entered_rate)} per ${silver.unit}`
               : "Add a verified rate to begin"}
           </small>
         </article>
@@ -176,7 +181,7 @@ export default function RatesPage({
                   <td>
                     <MetalTag metal={r.metal} />
                   </td>
-                  <td>{qty(r.purity)}%</td>
+                  <td>{formatPurity(r.purity)}</td>
                   <td>
                     <b>{money(r.entered_rate)}</b> / {r.unit}
                   </td>
@@ -212,17 +217,12 @@ export default function RatesPage({
                 <option value="silver">Silver</option>
               </select>
             </Field>
-            <Field label="Purity (%)">
-              <input
-                required
-                type="number"
-                min="0.01"
-                max="100"
-                step="0.01"
-                value={form.purity}
-                onChange={e => setForm({ ...form, purity: e.target.value })}
-              />
-            </Field>
+            <PurityField
+              value={form.purity}
+              onChange={v => setForm({ ...form, purity: v })}
+              unit={purityUnit}
+              onUnitChange={setPurityUnit}
+            />
             <Field label="Rate">
               <input
                 required

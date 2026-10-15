@@ -13,6 +13,7 @@ import {
 } from "../pos";
 import type { InventoryRow, MetalRate, Party, Product } from "../types";
 import ReceiptModal from "../ReceiptModal";
+import { formatPurity } from "../purity";
 import { Empty, Field, Modal, PanelHeading } from "../ui";
 
 interface CheckoutResult {
@@ -322,7 +323,7 @@ export default function POSPage({
                           <b>{p.name}</b>
                           <br />
                           <small className="hint">
-                            {p.sku} · {p.metal} {Number(p.purity)}%
+                            {p.sku} · {p.metal} {formatPurity(p.purity)}
                           </small>
                         </td>
                         <td>{qty(stock)} g</td>
@@ -368,7 +369,7 @@ export default function POSPage({
                       <td>
                         {line.name}
                         <br />
-                        <small className="hint">{Number(line.purity)}%</small>
+                        <small className="hint">{formatPurity(line.purity)}</small>
                       </td>
                       <td style={{ width: 90 }}>
                         <input

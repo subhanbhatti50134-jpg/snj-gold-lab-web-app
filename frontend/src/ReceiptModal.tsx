@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { prettyKarat } from "./purity";
 import { createPortal } from "react-dom";
 import { api, money } from "./api";
 
@@ -143,7 +144,7 @@ export default function ReceiptModal({
           )}
           <tr>
             <td>Purity</td>
-            <td>{fmt(data.purity)}%</td>
+            <td>{fmt(data.purity)}% · {prettyKarat(data.purity)}</td>
           </tr>
           <tr>
             <td>Rate</td>
