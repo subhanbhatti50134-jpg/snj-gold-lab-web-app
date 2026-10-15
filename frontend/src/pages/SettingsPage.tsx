@@ -575,7 +575,7 @@ export default function SettingsPage({
                     <td>
                       <b>{row.username}</b>
                       {row.id === user.id && (
-                        <span style={{ fontSize: 9, color: "#66768b" }}>
+                        <span style={{ fontSize: 9, color: "var(--text-3)" }}>
                           {" "}
                           (you)
                         </span>
@@ -599,7 +599,7 @@ export default function SettingsPage({
                           }
                           style={{
                             padding: "5px 7px",
-                            border: "1px solid #e7ecf2",
+                            border: "1px solid var(--border)",
                             borderRadius: 6,
                             fontSize: 10
                           }}

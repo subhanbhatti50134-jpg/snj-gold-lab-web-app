@@ -283,7 +283,7 @@ export default function TransactionsPage({
               />
             </Field>
             {Number(cancelTarget.amount_paid) > 0 && (
-              <label style={{ fontSize: 10, color: "#66768b" }}>
+              <label style={{ fontSize: 10, color: "var(--text-3)" }}>
                 <input
                   type="checkbox"
                   checked={includePayments}
@@ -405,8 +405,8 @@ export default function TransactionsPage({
 
 const selectStyle: React.CSSProperties = {
   padding: "7px 9px",
-  border: "1px solid #e7ecf2",
+  border: "1px solid var(--border)",
   borderRadius: 7,
   fontSize: 10,
-  color: "#526176"
+  color: "var(--text-2)"
 };

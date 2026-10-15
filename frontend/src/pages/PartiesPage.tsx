@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, atLeast, money, type CurrentUser } from "../api";
-import type {Party} from "../types";
+import type {AppSettings, Party} from "../types";
 import { Empty, Field, Modal, PanelHeading, Status, pretty } from "../ui";
+import { duesReminder, openWhatsApp } from "../whatsapp";
 
 const blank = {
   name: "",
@@ -32,6 +33,7 @@ export default function PartiesPage({
   const [editing, setEditing] = useState<Party | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [shopName, setShopName] = useState("");
 
   const canManage = atLeast(user, "manager");
 
@@ -53,6 +55,14 @@ export default function PartiesPage({
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+
+    api<AppSettings>("/api/settings")
+      .then(s => {
+        if (!cancelled) setShopName(s.business_name);
+      })
+      .catch(err => {
+        if (!cancelled) fail(err);
       });
 
     return () => {
@@ -146,10 +156,10 @@ export default function PartiesPage({
               onChange={e => setKind(e.target.value)}
               style={{
                 padding: "7px 9px",
-                border: "1px solid #e7ecf2",
+                border: "1px solid var(--border)",
                 borderRadius: 7,
                 fontSize: 10,
-                color: "#526176"
+                color: "var(--text-2)"
               }}
             >
               <option value="">All kinds</option>
@@ -167,7 +177,7 @@ export default function PartiesPage({
       />
 
       <div style={{ padding: "12px 19px 0" }}>
-        <label style={{ fontSize: 10, color: "#66768b" }}>
+        <label style={{ fontSize: 10, color: "var(--text-3)" }}>
           <input
             type="checkbox"
             checked={includeInactive}
@@ -198,13 +208,33 @@ export default function PartiesPage({
                 <td>
                   <b>{p.name}</b>
                   {p.address && (
-                    <div style={{ fontSize: 9, color: "#66768b" }}>
+                    <div style={{ fontSize: 9, color: "var(--text-3)" }}>
                       {p.address}
                     </div>
                   )}
                 </td>
                 <td>{pretty(p.kind)}</td>
-                <td>{p.phone || "—"}</td>
+                <td>
+                  <span>{p.phone || "—"}</span>
+                  {p.phone && Number(p.receivable) > 0 && (
+                    <button
+                      className="text-button"
+                      style={{ marginLeft: 8 }}
+                      onClick={() =>
+                        openWhatsApp(
+                          p.phone,
+                          duesReminder(
+                            p.name,
+                            shopName || "Saleem Nadeem Jewellers",
+                            money(p.receivable)
+                          )
+                        )
+                      }
+                    >
+                      WhatsApp
+                    </button>
+                  )}
+                </td>
                 <td>{money(p.receivable)}</td>
                 <td>{money(p.payable)}</td>
                 <td>

@@ -102,3 +102,85 @@ def test_summary_rejects_invalid_date_range(client):
     )
 
     assert response.status_code == 422
+
+
+def make_outstanding_sale(client, product_id, **extra):
+    response = client.post(
+        "/api/sales",
+        headers=login_headers(client, "operator"),
+        json=transaction_payload(product_id, weight=5, rate=100, amount_paid=100)
+        | extra,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_outstanding_includes_party_phone_via_party_id(client):
+    party = client.post(
+        "/api/parties",
+        headers=login_headers(client, "manager"),
+        json={"name": "Phone Customer", "phone": "0300-1234567"},
+    )
+    assert party.status_code == 201, party.text
+    product = create_product(client)
+    create_purchase(client, product["id"], weight=5, amount_paid=500)
+    make_outstanding_sale(
+        client, product["id"], party_id=party.json()["id"]
+    )
+
+    response = client.get(
+        "/api/reports/outstanding",
+        params={"kind": "sale"},
+        headers=login_headers(client, "viewer"),
+    )
+
+    assert response.status_code == 200, response.text
+    pid = party.json()["id"]
+    rows = [r for r in response.json()["items"] if r["party_id"] == pid]
+    assert rows, "expected an outstanding sale for the party"
+    assert rows[0]["party_phone"] == "0300-1234567"
+
+
+def test_outstanding_resolves_party_phone_by_name(client):
+    party = client.post(
+        "/api/parties",
+        headers=login_headers(client, "manager"),
+        json={"name": "Walk-in Credit", "phone": "03119998877"},
+    )
+    assert party.status_code == 201, party.text
+    product = create_product(client)
+    create_purchase(client, product["id"], weight=5, amount_paid=500)
+    make_outstanding_sale(
+        client, product["id"], party_name="Walk-in Credit"
+    )
+
+    response = client.get(
+        "/api/reports/outstanding",
+        params={"kind": "sale", "party_name": "Walk-in Credit"},
+        headers=login_headers(client, "viewer"),
+    )
+
+    assert response.status_code == 200, response.text
+    rows = response.json()["items"]
+    assert rows, "expected an outstanding sale for the walk-in party"
+    assert rows[0]["party_id"] is None
+    assert rows[0]["party_phone"] == "03119998877"
+
+
+def test_outstanding_without_party_has_empty_phone(client):
+    product = create_product(client)
+    create_purchase(client, product["id"], weight=5, amount_paid=500)
+    make_outstanding_sale(
+        client, product["id"], party_name="No Party Row"
+    )
+
+    response = client.get(
+        "/api/reports/outstanding",
+        params={"kind": "sale", "party_name": "No Party Row"},
+        headers=login_headers(client, "viewer"),
+    )
+
+    assert response.status_code == 200, response.text
+    rows = response.json()["items"]
+    assert rows
+    assert rows[0]["party_phone"] == ""

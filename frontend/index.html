@@ -10,6 +10,21 @@
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SNJ Gold Lab | Inventory & Transactions</title>
+    <script>
+      // Apply the saved theme before first paint so there is no flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem("hisabpro_theme");
+          var dark =
+            saved === "dark" ||
+            (saved !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.setAttribute("data-theme", "dark");
+        } catch (e) {
+          /* storage unavailable */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

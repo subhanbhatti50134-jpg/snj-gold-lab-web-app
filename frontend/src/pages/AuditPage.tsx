@@ -129,9 +129,9 @@ export default function AuditPage({
 
 const inputStyle: React.CSSProperties = {
   padding: "7px 9px",
-  border: "1px solid #e7ecf2",
+  border: "1px solid var(--border)",
   borderRadius: 7,
   fontSize: 10,
-  color: "#526176",
+  color: "var(--text-2)",
   minWidth: 130
 };

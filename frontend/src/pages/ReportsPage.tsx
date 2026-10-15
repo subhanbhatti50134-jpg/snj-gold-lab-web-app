@@ -8,6 +8,7 @@ import type {
   ReportSummary
 } from "../types";
 import { Empty, Field, Metric, PanelHeading, pretty } from "../ui";
+import { duesReminder, waLink } from "../whatsapp";
 
 interface OutstandingResponse {
   items: OutstandingItem[];
@@ -238,10 +239,10 @@ export default function ReportsPage({
               onChange={e => setOutstandingKind(e.target.value)}
               style={{
                 padding: "7px 9px",
-                border: "1px solid #e7ecf2",
+                border: "1px solid var(--border)",
                 borderRadius: 7,
                 fontSize: 10,
-                color: "#526176"
+                color: "var(--text-2)"
               }}
             >
               <option value="">All kinds</option>
@@ -261,24 +262,50 @@ export default function ReportsPage({
                 <th>Paid</th>
                 <th>Remaining</th>
                 <th>Date</th>
+                <th>Remind</th>
               </tr>
             </thead>
             <tbody>
-              {(outstanding?.items ?? []).map(row => (
-                <tr key={row.transaction_id}>
-                  <td>{row.reference}</td>
-                  <td>
-                    <span className={`kind ${row.kind}`}>{row.kind}</span>
-                  </td>
-                  <td>{row.party_name || "—"}</td>
-                  <td>{money(row.total_amount)}</td>
-                  <td>{money(row.amount_paid)}</td>
-                  <td className="due">
-                    <b>{money(row.remaining_amount)}</b>
-                  </td>
-                  <td>{new Date(row.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
+              {(outstanding?.items ?? []).map(row => {
+                const link =
+                  row.party_phone && Number(row.remaining_amount) > 0
+                    ? waLink(
+                        row.party_phone,
+                        duesReminder(
+                          row.party_name,
+                          settings?.business_name || "Saleem Nadeem Jewellers",
+                          money(row.remaining_amount)
+                        )
+                      )
+                    : null;
+                return (
+                  <tr key={row.transaction_id}>
+                    <td>{row.reference}</td>
+                    <td>
+                      <span className={`kind ${row.kind}`}>{row.kind}</span>
+                    </td>
+                    <td>{row.party_name || "—"}</td>
+                    <td>{money(row.total_amount)}</td>
+                    <td>{money(row.amount_paid)}</td>
+                    <td className="due">
+                      <b>{money(row.remaining_amount)}</b>
+                    </td>
+                    <td>{new Date(row.created_at).toLocaleDateString()}</td>
+                    <td>
+                      {link && (
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            window.open(link, "_blank", "noopener,noreferrer")
+                          }
+                        >
+                          WhatsApp
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {!outstanding?.items.length && !loading && (

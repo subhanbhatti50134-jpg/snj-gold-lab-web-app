@@ -13,6 +13,7 @@ import {
   History,
   LayoutDashboard,
   LogOut,
+  Moon,
   Package,
   RefreshCw,
   ScrollText,
@@ -21,6 +22,7 @@ import {
   ShoppingCart,
   ShoppingBag,
   Store,
+  Sun,
   Users,
   Wallet
 } from "lucide-react";
@@ -97,6 +99,9 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
+  const [darkTheme, setDarkTheme] = useState(
+    () => document.documentElement.dataset.theme === "dark"
+  );
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
@@ -310,6 +315,21 @@ export default function App() {
             </span>
             <button
               className="icon-button"
+              title={darkTheme ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={() => {
+                const next = !darkTheme;
+                setDarkTheme(next);
+                document.documentElement.dataset.theme = next ? "dark" : "light";
+                localStorage.setItem(
+                  "hisabpro_theme",
+                  next ? "dark" : "light"
+                );
+              }}
+            >
+              {darkTheme ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <button
+              className="icon-button"
               title="Refresh data"
               onClick={refresh}
             >
@@ -417,7 +437,12 @@ function PageBody({
       );
     case "Inventory":
       return (
-        <InventoryPage user={user} fail={fail} refreshKey={refreshKey} />
+        <InventoryPage
+          user={user}
+          fail={fail}
+          notice={notice}
+          refreshKey={refreshKey}
+        />
       );
     case "POS":
       return (

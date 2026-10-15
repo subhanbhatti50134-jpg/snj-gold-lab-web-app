@@ -146,7 +146,7 @@ export default function RatesPage({
         />
 
         <div style={{ padding: "12px 19px 0" }}>
-          <label style={{ fontSize: 10, color: "#66768b" }}>
+          <label style={{ fontSize: 10, color: "var(--text-3)" }}>
             <input
               type="checkbox"
               checked={includeHistory}

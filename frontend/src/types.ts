@@ -194,6 +194,8 @@ export interface OutstandingItem {
   reference: string;
   kind: "purchase" | "sale";
   party_name: string;
+  party_id: number | null;
+  party_phone: string;
   created_at: string;
   total_amount: number | string;
   amount_paid: number | string;

@@ -2,11 +2,12 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.permissions import READ_ROLES, require_roles
 from app.db.session import get_db
+from app.models.party import Party
 from app.models.payments import Payment
 from app.models.transaction import Transaction
 
@@ -128,15 +129,33 @@ def outstanding_report(
         .all()
     )
 
+    # Resolve party phone numbers for WhatsApp reminders: linked party_id
+    # first, then an exact unique name match (walk-in credit sales).
+    party_ids = {t.party_id for t in rows if t.party_id is not None}
+    party_names = {t.party_name for t in rows if t.party_name}
+    by_id: dict[int, Party] = {}
+    by_name: dict[str, Party] = {}
+    if party_ids or party_names:
+        parties = db.query(Party).filter(
+            or_(Party.id.in_(party_ids), Party.name.in_(party_names))
+        ).all()
+        by_id = {p.id: p for p in parties}
+        by_name = {p.name: p for p in parties}
+
     items = []
     for transaction in rows:
         total = Decimal(str(transaction.total_amount))
         paid = Decimal(str(transaction.amount_paid))
+        party = by_id.get(transaction.party_id) or by_name.get(
+            transaction.party_name
+        )
         items.append({
             "transaction_id": transaction.id,
             "reference": transaction.reference,
             "kind": transaction.kind,
             "party_name": transaction.party_name,
+            "party_id": transaction.party_id,
+            "party_phone": party.phone if party else "",
             "created_at": transaction.created_at,
             "total_amount": total,
             "amount_paid": paid,
