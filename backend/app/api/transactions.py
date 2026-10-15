@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.permissions import MANAGE_ROLES, READ_ROLES, require_roles
@@ -13,6 +13,7 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.movements import TransactionCancel
 from app.schemas.transaction import BusinessHeader, TransactionDetailOut, TransactionOut
+from app.services.purge import purge_transaction
 from app.services.reversals import cancel_transaction
 from app.services.settings import get_settings
 
@@ -153,3 +154,19 @@ def cancel(
         username=user.username,
         include_payments=payload.include_payments,
     )
+
+
+@router.delete(
+    "/{transaction_id}",
+    status_code=status.HTTP_200_OK,
+)
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
+):
+    """Permanently purge a transaction (and its stock/payment rows)."""
+    detail = purge_transaction(
+        db, transaction_id, username=user.username
+    )
+    return {"deleted": True, "detail": detail}

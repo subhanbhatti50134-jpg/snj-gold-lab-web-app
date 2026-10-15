@@ -35,6 +35,7 @@ export default function PartiesPage({
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [shopName, setShopName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Party | null>(null);
 
   const canManage = atLeast(user, "manager");
 
@@ -128,6 +129,23 @@ export default function PartiesPage({
       refresh();
     } catch (error) {
       fail(error);
+    }
+  }
+
+  async function submitDelete(event: FormEvent) {
+    event.preventDefault();
+    if (!deleteTarget) return;
+    setSaving(true);
+
+    try {
+      await api(`/api/parties/${deleteTarget.id}`, { method: "DELETE" });
+      notice("Party permanently delete ho gaya.");
+      setDeleteTarget(null);
+      refresh();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -285,6 +303,12 @@ export default function PartiesPage({
                       >
                         {p.active ? "Deactivate" : "Activate"}
                       </button>
+                      <button
+                        className="text-button danger"
+                        onClick={() => setDeleteTarget(p)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 )}
@@ -356,6 +380,36 @@ export default function PartiesPage({
               </button>
               <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? "Saving…" : editing ? "Save changes" : "Save party"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          title={`Delete ${deleteTarget.name}`}
+          subtitle="Permanent — only parties with no transaction history can be deleted."
+          onClose={() => setDeleteTarget(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitDelete}>
+            <p className="hint">
+              {pretty(deleteTarget.kind)} · {deleteTarget.phone || "no phone"}
+            </p>
+            <p className="hint">
+              Agar is party par koi transaction hai to delete block ho jayega —
+              us case mein Deactivate use karein.
+            </p>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Keep it
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Deleting…" : "Delete forever"}
               </button>
             </div>
           </form>

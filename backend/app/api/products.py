@@ -15,6 +15,7 @@ from app.models.product import Product
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.services.audit import log_audit
+from app.services.purge import purge_product
 
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
@@ -137,3 +138,17 @@ def update_product(
 
     db.refresh(product)
     return product
+
+
+@router.delete(
+    "/{product_id}",
+    status_code=status.HTTP_200_OK,
+)
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
+):
+    """Permanently delete a product that has no history yet."""
+    detail = purge_product(db, product_id, username=user.username)
+    return {"deleted": True, "detail": detail}

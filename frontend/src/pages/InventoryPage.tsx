@@ -43,6 +43,7 @@ export default function InventoryPage({
     reason: ""
   });
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     sku: "",
@@ -256,6 +257,22 @@ export default function InventoryPage({
     }
   }
 
+  async function submitDelete(e: FormEvent) {
+    e.preventDefault();
+    if (!deleteProduct) return;
+    setSaving(true);
+    try {
+      await api(`/api/products/${deleteProduct.id}`, { method: "DELETE" });
+      notice(`Product ${deleteProduct.name} delete ho gaya.`);
+      setDeleteProduct(null);
+      bump();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="panel">
       <PanelHeading
@@ -349,6 +366,14 @@ export default function InventoryPage({
                                 onClick={() => openEdit(product)}
                               >
                                 Edit
+                              </button>
+                            )}
+                            {product && (
+                              <button
+                                className="text-button danger"
+                                onClick={() => setDeleteProduct(product)}
+                              >
+                                Delete
                               </button>
                             )}
                           </>
@@ -600,6 +625,36 @@ export default function InventoryPage({
               </button>
               <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? "Saving…" : "Save product"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteProduct && (
+        <Modal
+          title={`Delete ${deleteProduct.name}`}
+          subtitle="Permanent — only products with no transactions or stock history can be deleted."
+          onClose={() => setDeleteProduct(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitDelete}>
+            <p className="hint">
+              {deleteProduct.sku} · {deleteProduct.purity}%
+            </p>
+            <p className="hint">
+              Agar is product par koi transaction ya stock movement hai to
+              delete block ho jayega — us case mein Edit se deactivate karein.
+            </p>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDeleteProduct(null)}
+              >
+                Keep it
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Deleting…" : "Delete forever"}
               </button>
             </div>
           </form>

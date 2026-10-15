@@ -45,6 +45,7 @@ export default function TransactionsPage({
   const [cancelTarget, setCancelTarget] = useState<Transaction | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [includePayments, setIncludePayments] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [payTarget, setPayTarget] = useState<Transaction | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payAmount, setPayAmount] = useState("");
@@ -108,6 +109,28 @@ export default function TransactionsPage({
       setCancelTarget(null);
       setCancelReason("");
       setIncludePayments(false);
+      bump();
+      void load();
+    } catch (error) {
+      fail(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitDelete(event: FormEvent) {
+    event.preventDefault();
+    if (!deleteTarget) return;
+    setBusy(true);
+
+    try {
+      await api(`/api/transactions/${deleteTarget.id}`, {
+        method: "DELETE"
+      });
+      notice(
+        `Transaction ${deleteTarget.reference} permanently delete ho gayi.`
+      );
+      setDeleteTarget(null);
       bump();
       void load();
     } catch (error) {
@@ -192,7 +215,7 @@ export default function TransactionsPage({
     <section className="panel">
       <PanelHeading
         title="Transaction history"
-        subtitle="Every record stays in the ledger — cancellations never delete rows"
+        subtitle="Cancellations reverse safely; managers can permanently purge a record"
         search={search}
         setSearch={setSearch}
         action={
@@ -278,6 +301,14 @@ export default function TransactionsPage({
                       Cancel
                     </button>
                   )}
+                {canManage && (
+                  <button
+                    className="text-button danger"
+                    onClick={() => setDeleteTarget(row)}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             );
           }}
@@ -334,6 +365,39 @@ export default function TransactionsPage({
                 disabled={busy || cancelReason.trim().length < 3}
               >
                 {busy ? "Cancelling…" : "Cancel transaction"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          title={`Delete ${deleteTarget.reference}`}
+          subtitle="Permanent — this row and its stock/payment history are removed."
+          onClose={() => setDeleteTarget(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitDelete}>
+            <p className="hint">
+              {pretty(deleteTarget.kind)} · {qty(deleteTarget.quantity_grams)}{" "}
+              g · {money(deleteTarget.total_amount)} (paid:{" "}
+              {money(deleteTarget.amount_paid)})
+            </p>
+            <p className="hint">
+              Stock movements wapas ho jayenge, payments delete ho jayenge. Ye
+              undo nahi hoga — cancel (reversal) safer option hai. Agar is sale
+              par return hai to pehle return delete karein.
+            </p>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Keep it
+              </button>
+              <button type="submit" className="primary-button" disabled={busy}>
+                {busy ? "Deleting…" : "Delete forever"}
               </button>
             </div>
           </form>

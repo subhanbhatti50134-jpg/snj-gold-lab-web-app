@@ -11,6 +11,7 @@ from app.services.parties import (
     list_parties,
     update_party,
 )
+from app.services.purge import purge_party
 
 router = APIRouter(prefix="/api/parties", tags=["Customers & Suppliers"])
 
@@ -57,3 +58,17 @@ def edit_party(
 ):
     update_party(db, party_id, payload, user.username)
     return get_party(db, party_id)
+
+
+@router.delete(
+    "/{party_id}",
+    status_code=status.HTTP_200_OK,
+)
+def delete_party(
+    party_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*MANAGE_ROLES)),
+):
+    """Permanently delete a party that has no transaction history."""
+    detail = purge_party(db, party_id, username=user.username)
+    return {"deleted": True, "detail": detail}

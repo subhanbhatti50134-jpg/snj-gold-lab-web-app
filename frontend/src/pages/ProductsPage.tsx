@@ -43,6 +43,7 @@ export default function ProductsPage({
   const [form, setForm] = useState(blank);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   const canManage = atLeast(user, "manager");
 
@@ -113,6 +114,23 @@ export default function ProductsPage({
     }
   }
 
+  async function submitDelete(event: FormEvent) {
+    event.preventDefault();
+    if (!deleteTarget) return;
+    setSaving(true);
+
+    try {
+      await api(`/api/products/${deleteTarget.id}`, { method: "DELETE" });
+      notice(`${deleteTarget.name} delete ho gaya.`);
+      setProducts(rows => rows.filter(row => row.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      fail(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="panel">
       <PanelHeading
@@ -176,6 +194,13 @@ export default function ProductsPage({
                       onClick={() => void toggleActive(p)}
                     >
                       {p.active ? "Deactivate" : "Activate"}
+                    </button>
+                    {"  "}
+                    <button
+                      className="text-button danger"
+                      onClick={() => setDeleteTarget(p)}
+                    >
+                      Delete
                     </button>
                   </td>
                 )}
@@ -254,6 +279,37 @@ export default function ProductsPage({
               </button>
               <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? "Saving…" : "Save product"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          title={`Delete ${deleteTarget.name}`}
+          subtitle="Permanent — only products with no transactions or stock history can be deleted."
+          onClose={() => setDeleteTarget(null)}
+        >
+          <form className="form-grid modal-form" onSubmit={submitDelete}>
+            <p className="hint">
+              {deleteTarget.sku} · {pretty(deleteTarget.metal)} ·{" "}
+              {deleteTarget.purity}%
+            </p>
+            <p className="hint">
+              Agar is product par koi transaction ya stock movement hai to
+              delete block ho jayega — us case mein Deactivate use karein.
+            </p>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Keep it
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Deleting…" : "Delete forever"}
               </button>
             </div>
           </form>
