@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
-import { api, atLeast, money, type CurrentUser } from "../api";
+import { api, atLeast, downloadCsv, money, type CurrentUser } from "../api";
 import type {AppSettings, Party} from "../types";
 import { Empty, Field, Modal, PanelHeading, Status, pretty } from "../ui";
 import { duesReminder, openWhatsApp } from "../whatsapp";
@@ -33,6 +33,7 @@ export default function PartiesPage({
   const [editing, setEditing] = useState<Party | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [shopName, setShopName] = useState("");
 
   const canManage = atLeast(user, "manager");
@@ -142,6 +143,25 @@ export default function PartiesPage({
       .catch(fail);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        include_inactive: String(includeInactive)
+      });
+      if (search.trim()) params.set("search", search.trim());
+      if (kind) params.set("kind", kind);
+      await downloadCsv(
+        `/api/export/parties.csv?${params.toString()}`,
+        "parties.csv"
+      );
+    } catch (error) {
+      fail(error);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <section className="panel">
       <PanelHeading
@@ -167,6 +187,13 @@ export default function PartiesPage({
               <option value="supplier">Suppliers</option>
               <option value="both">Both</option>
             </select>
+            <button
+              className="secondary-button"
+              onClick={() => void handleExport()}
+              disabled={exporting}
+            >
+              {exporting ? "Exporting…" : "Export CSV"}
+            </button>
             {canManage && (
               <button className="primary-button" onClick={openCreate}>
                 <Plus size={16} /> Add party

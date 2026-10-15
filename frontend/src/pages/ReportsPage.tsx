@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, money, qty, type CurrentUser } from "../api";
+import { api, downloadCsv, money, qty, type CurrentUser } from "../api";
 import type {
   AppSettings,
   CashflowReport,
@@ -62,6 +62,8 @@ export default function ReportsPage({
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [outExporting, setOutExporting] = useState(false);
+  const [ledgerExporting, setLedgerExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +121,37 @@ export default function ReportsPage({
       setLedger(null);
     } finally {
       setLedgerLoading(false);
+    }
+  }
+
+  async function exportOutstanding() {
+    setOutExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (outstandingKind) params.set("kind", outstandingKind);
+      const suffix = params.toString() ? `?${params}` : "";
+      await downloadCsv(`/api/export/outstanding.csv${suffix}`, "outstanding.csv");
+    } catch (error) {
+      fail(error);
+    } finally {
+      setOutExporting(false);
+    }
+  }
+
+  async function exportLedger() {
+    if (!ledger) return;
+    setLedgerExporting(true);
+    try {
+      await downloadCsv(
+        `/api/export/party-ledger.csv?party_name=${encodeURIComponent(
+          ledger.party_name
+        )}`,
+        "ledger.csv"
+      );
+    } catch (error) {
+      fail(error);
+    } finally {
+      setLedgerExporting(false);
     }
   }
 
@@ -234,21 +267,30 @@ export default function ReportsPage({
           title="Outstanding amounts"
           subtitle="Active purchases and sales that still have a balance due"
           action={
-            <select
-              value={outstandingKind}
-              onChange={e => setOutstandingKind(e.target.value)}
-              style={{
-                padding: "7px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 7,
-                fontSize: 10,
-                color: "var(--text-2)"
-              }}
-            >
-              <option value="">All kinds</option>
-              <option value="purchase">Purchases (payable)</option>
-              <option value="sale">Sales (receivable)</option>
-            </select>
+            <div className="panel-tools">
+              <select
+                value={outstandingKind}
+                onChange={e => setOutstandingKind(e.target.value)}
+                style={{
+                  padding: "7px 9px",
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  fontSize: 10,
+                  color: "var(--text-2)"
+                }}
+              >
+                <option value="">All kinds</option>
+                <option value="purchase">Purchases (payable)</option>
+                <option value="sale">Sales (receivable)</option>
+              </select>
+              <button
+                className="secondary-button"
+                onClick={() => void exportOutstanding()}
+                disabled={outExporting}
+              >
+                {outExporting ? "Exporting…" : "Export CSV"}
+              </button>
+            </div>
           }
         />
         <div className="table-scroll">
@@ -336,6 +378,18 @@ export default function ReportsPage({
             disabled={ledgerLoading || !partyName.trim()}
           >
             {ledgerLoading ? "Loading…" : "View ledger"}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => void exportLedger()}
+            disabled={ledgerExporting || !ledger}
+            title={
+              ledger
+                ? "Download the loaded ledger as CSV"
+                : "View a ledger first, then export it"
+            }
+          >
+            {ledgerExporting ? "Exporting…" : "Export CSV"}
           </button>
         </div>
 

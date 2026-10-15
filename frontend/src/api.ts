@@ -156,6 +156,65 @@ export async function api<T>(
   return data as T;
 }
 
+// Download a CSV export with the session token attached; the browser's
+// save dialog picks up the server-provided filename.
+export async function downloadCsv(
+  path: string,
+  fallbackName: string
+): Promise<void> {
+  const headers = new Headers({ Accept: "text/csv" });
+  const token = getToken();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE}${path}`, { headers });
+  } catch {
+    throw new Error(`Backend connect nahi hua. Check karein: ${API_BASE}`);
+  }
+
+  if (
+    response.status === 401 &&
+    token &&
+    (response.headers.get("content-type") || "").includes("json")
+  ) {
+    clearToken();
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    throw new Error("Session expire ho gaya. Dobara login karein.");
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    let detail = "";
+    try {
+      const data: unknown = JSON.parse(body);
+      if (typeof data === "object" && data !== null) {
+        const d = (data as { detail?: unknown }).detail;
+        if (typeof d === "string") detail = d;
+      }
+    } catch {
+      detail = body;
+    }
+    throw new Error(detail || `Export failed: ${response.status}`);
+  }
+
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = match?.[1] || fallbackName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Currency used by money(). Defaults to PKR until settings load.
 let activeCurrency = "PKR";
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import {
   api,
   atLeast,
+  downloadCsv,
   money,
   newIdempotencyKey,
   qty,
@@ -36,6 +37,7 @@ export default function TransactionsPage({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState<"active" | "cancelled" | "all">(
     "active"
   );
@@ -169,6 +171,23 @@ export default function TransactionsPage({
   const dueOf = (t: Transaction) =>
     Math.max(0, Number(t.total_amount) - Number(t.amount_paid));
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ status });
+      if (kind) params.set("kind", kind);
+      if (search.trim()) params.set("search", search.trim());
+      await downloadCsv(
+        `/api/export/transactions.csv?${params.toString()}`,
+        "transactions.csv"
+      );
+    } catch (error) {
+      fail(error);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <section className="panel">
       <PanelHeading
@@ -199,6 +218,13 @@ export default function TransactionsPage({
               <option value="cancelled">Cancelled</option>
               <option value="all">All</option>
             </select>
+            <button
+              className="secondary-button"
+              onClick={() => void handleExport()}
+              disabled={exporting}
+            >
+              {exporting ? "Exporting…" : "Export CSV"}
+            </button>
           </div>
         }
       />

@@ -13,6 +13,7 @@ from app.api.auth import router as auth_router
 from app.api.backup import router as backup_router
 from app.api.cashflow import router as cashflow_router
 from app.api.dashboard import router as dashboard_router
+from app.api.export import router as export_router
 from app.api.inventory import router as inventory_router
 from app.api.monitoring import router as monitoring_router
 from app.api.movements import router as movements_router
@@ -122,6 +123,7 @@ app.include_router(transactions_router)
 app.include_router(payments_router)
 app.include_router(movements_router)
 app.include_router(reports_router)
+app.include_router(export_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(parties_router)
