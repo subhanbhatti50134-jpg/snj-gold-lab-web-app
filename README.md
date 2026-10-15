@@ -19,6 +19,8 @@ production launch checklist (secrets, first run, backups, HTTPS, sign-off).
   checkout records each line as its own sale, all-or-nothing.
 - **Purchases & sales** — gross weight, deduction, net weight, purity, rate,
   charges and initial payment. Totals are always calculated by the backend.
+  Sales can carry a **making charge (ujra)** — fixed per gram, percentage of
+  the metal value, or a flat amount — refunded proportionally on returns.
 - **Stock control** — movements per location (Main Store, Vault, …), oversell
   protection, negative-stock guard (configurable via settings).
 - **Returns, adjustments & transfers** — sales return restores stock and
@@ -31,6 +33,13 @@ production launch checklist (secrets, first run, backups, HTTPS, sign-off).
   backend posts compensating stock movements, optionally a refund payment,
   and an audit entry. Cancelled rows stay in the ledger but are excluded
   from reports.
+- **Hard delete (purge)** — manager/admin can permanently delete a single
+  transaction from History: its stock movements and payments are removed,
+  stock is re-validated first (sales with active returns, or purges that
+  would go negative, are refused) and a `transaction.delete` audit entry
+  records what was removed. Products and parties delete only while nothing
+  references them — otherwise the API answers 409 and deactivate is the
+  path.
 - **Reports** — financial summary, outstanding amounts, party ledger,
   cashflow (money received / paid / net), and a best-effort profit
   estimate (sales minus returns minus purchases — clearly labelled as
@@ -43,9 +52,17 @@ production launch checklist (secrets, first run, backups, HTTPS, sign-off).
 - **Users & roles** — `admin`, `manager`, `operator`, `viewer` with JWT
   login. Role changes are audit-logged.
 - **Audit log** — every important action records who did what (admin only).
+- **CSV exports** — transactions, outstanding, parties and per-party
+  ledgers export as UTF-8 CSV (formula-injection guarded) from the
+  respective pages.
+- **WhatsApp dues reminders** — Parties page opens WhatsApp with a
+  prefilled, editable outstanding-balance message per customer.
 - **Settings & backups** — business name, currency, default location,
   negative-stock switch; pg_dump backups plus portable JSON
-  backup/restore with a guarded confirm step.
+  backup/restore with a guarded confirm step. Admins see a dashboard
+  banner once the newest backup is older than 7 days (or none exists).
+- **Dark mode** — system-following light/dark theme with a manual
+  toggle.
 
 ## Requirements
 
@@ -232,9 +249,10 @@ docker compose up --build -d          # or: podman-compose up -d
 - Frontend: <http://localhost:8080> (nginx serves the build and proxies
   `/api` to the backend)
 - Backend: <http://127.0.0.1:8000/docs>
-- PostgreSQL: **internal only** — no host port is published; the
-  database is reachable solely inside the compose network (data lives
-  in the `hisabpro_data` volume)
+- PostgreSQL: **loopback-only host port** `127.0.0.1:5433` — reachable
+  from this machine only (local scripts and the PG test suite use it;
+  never exposed to LAN/WAN). Inside the compose network the backend
+  talks to `db:5432` (data lives in the `hisabpro_data` volume)
 - Backups land encrypted (`.enc`) in the `hisabpro_backups` volume
 
 First run on a fresh machine — create the admin account:
@@ -292,6 +310,54 @@ docker compose --profile offsite up -d
 `rclone.conf` is gitignored (it can contain OAuth tokens). The sync
 container idles harmlessly until `RCLONE_REMOTE` is set.
 
+### Publishing the app for free (Cloudflare quick tunnel)
+
+The whole stack can be published to the internet from the same laptop —
+no server, no account, no card. `cloudflared` opens an outbound-only
+tunnel to trycloudflare.com and proxies it to nginx on `:8080`:
+
+```bash
+# 1) one-time: official binary, no root needed
+mkdir -p ~/.local/bin
+curl -sL -o ~/.local/bin/cloudflared \
+  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+chmod +x ~/.local/bin/cloudflared
+
+# 2) systemd user unit — ~/.config/systemd/user/hisabpro-tunnel.service
+cat > ~/.config/systemd/user/hisabpro-tunnel.service <<'EOF'
+[Unit]
+Description=HisabPro Cloudflare quick tunnel (public URL)
+After=hisabpro.service
+Wants=hisabpro.service
+
+[Service]
+ExecStart=%h/.local/bin/cloudflared tunnel --url http://127.0.0.1:8080
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+
+# 3) enable + read the public URL from the journal
+systemctl --user daemon-reload
+systemctl --user enable --now hisabpro-tunnel
+journalctl --user -u hisabpro-tunnel \
+  | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | grep -v api | tail -1
+```
+
+Notes:
+
+- The quick-tunnel URL is random and **changes on every restart** —
+  re-read it from the journal as shown above. A fixed hostname needs a
+  Cloudflare account + your own domain (paid named tunnel).
+- The machine must stay on and online; with `loginctl enable-linger`
+  the user services start at boot. Data never leaves the machine —
+  only the HTTPS proxy passes through Cloudflare.
+- The URL is obscure but **not** authentication: the app login, JWT and
+  login rate-limiting still gate every API call. Use a strong admin
+  password once published.
+
 ## 6. Backup & restore
 
 Backups are **encrypted at rest** (AES-256-GCM, key from
@@ -348,6 +414,10 @@ pg_restore --clean --if-exists -h 127.0.0.1 -U hisabpro -d hisabpro backups/my-b
   which posts a negative refund payment.
 - Cancelled transactions are excluded from summaries and outstanding reports,
   but their payments (including refunds) still appear in cashflow.
+- **Purging** (manager/admin `DELETE`) is the only path that removes a row:
+  stock movements and payments go with it, the stock effect is re-checked
+  against the negative-stock setting, and an audit entry keeps the summary
+  of what vanished.
 
 ## 9. Project layout
 
