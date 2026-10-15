@@ -5,9 +5,11 @@ import {
   cartTotal,
   defaultRate,
   lineTotal,
+  makingOf,
   money2,
   validateCart,
-  type CartLine
+  type CartLine,
+  type MakingChargeType
 } from "../pos";
 import type { InventoryRow, MetalRate, Party, Product } from "../types";
 import ReceiptModal from "../ReceiptModal";
@@ -139,7 +141,9 @@ export default function POSPage({
         metal: product.metal,
         purity: Number(product.purity),
         quantity_grams: 1,
-        rate_per_gram: rate ?? 0
+        rate_per_gram: rate ?? 0,
+        making_charge_type: "",
+        making_charge_value: 0
       }
     ]);
     setSearch("");
@@ -174,6 +178,8 @@ export default function POSPage({
       rate_per_gram: line.rate_per_gram,
       rate_unit: "gram" as const,
       charges: 0,
+      making_charge_type: line.making_charge_type,
+      making_charge_value: line.making_charge_value,
       amount_paid: allocation.paidPerLine[index] ?? 0,
       payment_method: paymentMethod,
       party_id: party ? party.id : null,
@@ -351,6 +357,7 @@ export default function POSPage({
                     <th>Item</th>
                     <th>Weight (g)</th>
                     <th>Rate/g</th>
+                    <th>Ujra</th>
                     <th>Total</th>
                     <th></th>
                   </tr>
@@ -389,7 +396,51 @@ export default function POSPage({
                           }
                         />
                       </td>
-                      <td>{money(lineTotal(line))}</td>
+                      <td style={{ width: 165 }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <select
+                            value={line.making_charge_type}
+                            onChange={e =>
+                              updateLine(line.key, {
+                                making_charge_type: e.target
+                                  .value as MakingChargeType
+                              })
+                            }
+                            style={{ flex: 1, minWidth: 0 }}
+                          >
+                            <option value="">No ujra</option>
+                            <option value="per_gram">Rs / gram</option>
+                            <option value="percent">% of metal</option>
+                            <option value="fixed">Fixed</option>
+                          </select>
+                          {line.making_charge_type && (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={line.making_charge_value}
+                              aria-label="Making charge value"
+                              onChange={e =>
+                                updateLine(line.key, {
+                                  making_charge_value: Number(e.target.value)
+                                })
+                              }
+                              style={{ width: 72 }}
+                            />
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        {money(lineTotal(line))}
+                        {makingOf(line) > 0 && (
+                          <>
+                            <br />
+                            <small className="hint">
+                              ujra {money(makingOf(line))}
+                            </small>
+                          </>
+                        )}
+                      </td>
                       <td>
                         <button
                           type="button"

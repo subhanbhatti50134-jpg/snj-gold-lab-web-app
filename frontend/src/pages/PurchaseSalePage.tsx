@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, money, newIdempotencyKey, type CurrentUser } from "../api";
+import type { MakingChargeType } from "../pos";
 import type {MetalRate, Party, Product, RateUnit} from "../types";
 import { Field } from "../ui";
 
@@ -24,6 +25,8 @@ const blank = (location: string) => ({
   rate_per_gram: "",
   rate_unit: "tola" as RateUnit,
   charges: "0",
+  making_charge_type: "" as MakingChargeType,
+  making_charge_value: "0",
   amount_paid: "0",
   payment_method: "cash",
   location,
@@ -135,10 +138,21 @@ export default function PurchaseSalePage({
         ? 1000
         : 1;
 
+  const metal =
+    net > 0 && rate > 0 ? (net * (rate / factor) * purity) / 100 : 0;
+
+  const makingValue = Number(form.making_charge_value || 0);
+  const making =
+    kind !== "sale" || !form.making_charge_type || metal <= 0
+      ? 0
+      : form.making_charge_type === "per_gram"
+        ? net * makingValue
+        : form.making_charge_type === "percent"
+          ? (metal * makingValue) / 100
+          : makingValue;
+
   const estimatedTotal =
-    net > 0 && rate > 0
-      ? (net * (rate / factor) * purity) / 100 + charges
-      : 0;
+    metal > 0 ? metal + charges + making : 0;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -173,6 +187,11 @@ export default function PurchaseSalePage({
       notes: form.notes,
       transaction_date: form.transaction_date
     };
+
+    if (kind === "sale" && form.making_charge_type) {
+      payload.making_charge_type = form.making_charge_type;
+      payload.making_charge_value = Number(form.making_charge_value || 0);
+    }
 
     if (form.party_id) payload.party_id = Number(form.party_id);
 
@@ -378,6 +397,40 @@ export default function PurchaseSalePage({
             onChange={e => setForm({ ...form, charges: e.target.value })}
           />
         </Field>
+
+        {kind === "sale" && (
+          <Field label="Making charge (ujra)">
+            <div style={{ display: "flex", gap: 8 }}>
+              <select
+                value={form.making_charge_type}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    making_charge_type: e.target.value as MakingChargeType
+                  })
+                }
+              >
+                <option value="">No ujra</option>
+                <option value="per_gram">Rs / gram</option>
+                <option value="percent">% of metal</option>
+                <option value="fixed">Fixed amount</option>
+              </select>
+              {form.making_charge_type && (
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.making_charge_value}
+                  aria-label="Making charge value"
+                  onChange={e =>
+                    setForm({ ...form, making_charge_value: e.target.value })
+                  }
+                  style={{ width: 110 }}
+                />
+              )}
+            </div>
+          </Field>
+        )}
 
         <Field label="Amount paid now (PKR)">
           <input

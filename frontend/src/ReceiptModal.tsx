@@ -16,6 +16,9 @@ export interface ReceiptData {
   purity: string;
   rate_per_gram: string;
   charges: string;
+  making_charge_type: string;
+  making_charge_value: string;
+  making_amount: string;
   total_amount: string;
   party_name: string;
   location: string;
@@ -150,6 +153,12 @@ export default function ReceiptModal({
             <tr>
               <td>Charges</td>
               <td>{money(data.charges)}</td>
+            </tr>
+          )}
+          {Number(data.making_amount) > 0 && (
+            <tr>
+              <td>Making (ujra)</td>
+              <td>{money(data.making_amount)}</td>
             </tr>
           )}
           {data.party_name && (

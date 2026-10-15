@@ -1,5 +1,6 @@
 
 from datetime import date
+from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -15,7 +16,7 @@ from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate
 from app.services.audit import log_audit
 from app.services.inventory import get_stock_balance
-from app.services.pricing import calculate_total, normalize_rate
+from app.services.pricing import calculate_making, calculate_total, normalize_rate
 from app.services.settings import get_bool_setting
 
 
@@ -100,12 +101,31 @@ def create_transaction(
             )
         rate_per_gram = rate.rate_per_gram
 
+    making = Decimal("0")
+    if payload.making_charge_type or payload.making_charge_value != 0:
+        if kind != "sale":
+            raise HTTPException(
+                status_code=422,
+                detail="Making charge applies to sales only",
+            )
+        try:
+            making = calculate_making(
+                net_weight_grams=payload.net_weight_grams,
+                rate_per_gram=rate_per_gram,
+                purity=payload.purity,
+                charge_type=payload.making_charge_type,
+                charge_value=payload.making_charge_value,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     try:
         total = calculate_total(
             net_weight_grams=payload.net_weight_grams,
             rate_per_gram=rate_per_gram,
             charges=payload.charges,
             purity=payload.purity,
+            making=making,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -141,6 +161,9 @@ def create_transaction(
         rate_id=rate.id if rate else None,
         rate_per_gram=rate_per_gram,
         charges=payload.charges,
+        making_charge_type=payload.making_charge_type,
+        making_charge_value=payload.making_charge_value,
+        making_amount=making,
         total_amount=total,
         amount_paid=payload.amount_paid,
         party_name=party_name,

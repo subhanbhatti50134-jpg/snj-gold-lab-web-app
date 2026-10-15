@@ -34,6 +34,10 @@ class Transaction(Base):
             "AND amount_paid <= total_amount",
             name="ck_transactions_amounts",
         ),
+        CheckConstraint(
+            "making_charge_value >= 0 AND making_amount >= 0",
+            name="ck_transactions_making",
+        ),
         Index(
             "ix_transactions_kind_status_date",
             "kind",
@@ -72,6 +76,20 @@ class Transaction(Base):
     rate_per_gram: Mapped[Decimal] = mapped_column(Numeric(16, 4))
     charges: Mapped[Decimal] = mapped_column(
         Numeric(16, 2), default=Decimal("0")
+    )
+    # Ujra (making charge): "" = none, otherwise how the value is applied
+    # (per gram of net weight, percent of metal value, or fixed amount).
+    # making_amount stores the computed result so receipts and reports
+    # never have to recalculate historical rows. server_default matches
+    # the migration so raw SQL inserts get safe defaults too.
+    making_charge_type: Mapped[str] = mapped_column(
+        String(10), default="", server_default=""
+    )
+    making_charge_value: Mapped[Decimal] = mapped_column(
+        Numeric(16, 4), default=Decimal("0"), server_default="0"
+    )
+    making_amount: Mapped[Decimal] = mapped_column(
+        Numeric(16, 2), default=Decimal("0"), server_default="0"
     )
     total_amount: Mapped[Decimal] = mapped_column(Numeric(16, 2))
     amount_paid: Mapped[Decimal] = mapped_column(

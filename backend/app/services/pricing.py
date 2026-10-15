@@ -3,6 +3,8 @@ from decimal import ROUND_HALF_UP, Decimal
 
 MONEY_PLACES = Decimal("0.01")
 
+MAKING_CHARGE_TYPES = ("per_gram", "percent", "fixed")
+
 # Weight-unit conversion factors used to normalize entered rates and
 # weights to grams, which is the single internal unit of account.
 GRAMS_PER_TOLA = Decimal("11.6638")
@@ -42,14 +44,46 @@ def money(value: Decimal) -> Decimal:
     return value.quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
 
 
+def calculate_making(
+    net_weight_grams: Decimal,
+    rate_per_gram: Decimal,
+    purity: Decimal,
+    charge_type: str,
+    charge_value: Decimal,
+) -> Decimal:
+    """Compute the ujra (making charge) for a sale.
+
+    per_gram: value for each gram of net weight.
+    percent:  percent of the metal value (net * rate * purity / 100).
+    fixed:    flat amount regardless of weight.
+    """
+    if charge_type == "":
+        return money(Decimal("0"))
+    if charge_type not in MAKING_CHARGE_TYPES:
+        raise ValueError(f"Unknown making charge type: {charge_type}")
+    if charge_value <= 0:
+        raise ValueError("Making charge value must be greater than zero")
+
+    if charge_type == "per_gram":
+        amount = net_weight_grams * charge_value
+    elif charge_type == "percent":
+        metal_value = net_weight_grams * rate_per_gram * purity / Decimal("100")
+        amount = metal_value * charge_value / Decimal("100")
+    else:
+        amount = charge_value
+
+    return money(amount)
+
+
 def calculate_total(
     net_weight_grams: Decimal,
     rate_per_gram: Decimal,
     charges: Decimal = Decimal("0"),
     purity: Decimal = Decimal("100"),
+    making: Decimal = Decimal("0"),
 ) -> Decimal:
     """
-    Calculate metal value plus charges.
+    Calculate metal value plus making charge plus charges.
 
     Purity is expressed as a percentage:
     100 = pure metal, 91.6 = 22K-like purity.
@@ -61,8 +95,10 @@ def calculate_total(
         raise ValueError("Rate per gram must be greater than zero")
     if charges < 0:
         raise ValueError("Charges cannot be negative")
+    if making < 0:
+        raise ValueError("Making charge cannot be negative")
     if not Decimal("0") <= purity <= Decimal("100"):
         raise ValueError("Purity must be between 0 and 100")
 
     metal_value = net_weight_grams * rate_per_gram * purity / Decimal("100")
-    return money(metal_value + charges)
+    return money(metal_value + making + charges)

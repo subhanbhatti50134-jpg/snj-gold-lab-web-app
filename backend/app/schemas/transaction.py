@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RateUnit = Literal["gram", "tola", "kilogram"]
+MakingChargeType = Literal["", "per_gram", "percent", "fixed"]
 
 
 class TransactionCreate(BaseModel):
@@ -28,6 +29,12 @@ class TransactionCreate(BaseModel):
     rate_per_gram: Decimal | None = Field(default=None, gt=0)
     rate_unit: RateUnit = "gram"
     charges: Decimal = Field(default=Decimal("0"), ge=0)
+    # Ujra: per_gram = value per gram of net weight, percent = percent of
+    # metal value, fixed = flat amount. Empty type means no making charge.
+    making_charge_type: MakingChargeType = ""
+    making_charge_value: Decimal = Field(
+        default=Decimal("0"), ge=0, max_digits=16, decimal_places=4
+    )
     amount_paid: Decimal = Field(default=Decimal("0"), ge=0)
     payment_method: Literal["cash", "bank_transfer", "other"] = "cash"
 
@@ -54,6 +61,20 @@ class TransactionCreate(BaseModel):
 
         return self
 
+    @model_validator(mode="after")
+    def validate_making_charge(self):
+        if self.making_charge_type:
+            if self.making_charge_value <= 0:
+                raise ValueError(
+                    "Making charge value must be greater than zero"
+                )
+        elif self.making_charge_value != 0:
+            raise ValueError(
+                "Select a making charge type or set the value to zero"
+            )
+
+        return self
+
 
 class TransactionOut(BaseModel):
     id: int
@@ -65,6 +86,9 @@ class TransactionOut(BaseModel):
     quantity_grams: Decimal
     rate_per_gram: Decimal
     charges: Decimal
+    making_charge_type: str = ""
+    making_charge_value: Decimal = Decimal("0")
+    making_amount: Decimal = Decimal("0")
     total_amount: Decimal
     amount_paid: Decimal
     party_name: str

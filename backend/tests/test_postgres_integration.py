@@ -544,10 +544,12 @@ def test_pg_constraints_reject_invalid_rows(pg_engine):
             "INSERT INTO transactions (reference, kind, product_id, "
             "quantity_grams, gross_weight_grams, net_weight_grams, "
             "deduction_grams, purity, rate_per_gram, charges, "
+            "making_charge_type, making_charge_value, making_amount, "
             "total_amount, amount_paid, party_name, location, notes, "
             "created_by, status, created_at, transaction_date) "
             "VALUES ('PG-BAD-W', 'sale', :pid, -1, 1, 1, 0, 99, 100, 0, "
-            "100, 0, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "'', 0, 0, 100, 0, '', 'Main', '', 't', 'active', now(), "
+            "'2026-01-01')",
             "ck_transactions_weights",
         ),
         (
@@ -555,10 +557,12 @@ def test_pg_constraints_reject_invalid_rows(pg_engine):
             "INSERT INTO transactions (reference, kind, product_id, "
             "quantity_grams, gross_weight_grams, net_weight_grams, "
             "deduction_grams, purity, rate_per_gram, charges, "
+            "making_charge_type, making_charge_value, making_amount, "
             "total_amount, amount_paid, party_name, location, notes, "
             "created_by, status, created_at, transaction_date) "
             "VALUES ('PG-BAD-P', 'sale', :pid, 1, 1, 1, 0, 99, 100, 0, "
-            "100, 500, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "'', 0, 0, 100, 500, '', 'Main', '', 't', 'active', now(), "
+            "'2026-01-01')",
             "ck_transactions_amounts",
         ),
         (
@@ -566,11 +570,26 @@ def test_pg_constraints_reject_invalid_rows(pg_engine):
             "INSERT INTO transactions (reference, kind, product_id, "
             "quantity_grams, gross_weight_grams, net_weight_grams, "
             "deduction_grams, purity, rate_per_gram, charges, "
+            "making_charge_type, making_charge_value, making_amount, "
             "total_amount, amount_paid, party_name, location, notes, "
             "created_by, status, created_at, transaction_date) "
             "VALUES ('PG-BAD-U', 'sale', :pid, 1, 1, 1, 0, 150, 100, 0, "
-            "100, 0, '', 'Main', '', 't', 'active', now(), '2026-01-01')",
+            "'', 0, 0, 100, 0, '', 'Main', '', 't', 'active', now(), "
+            "'2026-01-01')",
             "ck_transactions_purity",
+        ),
+        (
+            "negative making charge",
+            "INSERT INTO transactions (reference, kind, product_id, "
+            "quantity_grams, gross_weight_grams, net_weight_grams, "
+            "deduction_grams, purity, rate_per_gram, charges, "
+            "making_charge_type, making_charge_value, making_amount, "
+            "total_amount, amount_paid, party_name, location, notes, "
+            "created_by, status, created_at, transaction_date) "
+            "VALUES ('PG-BAD-M', 'sale', :pid, 1, 1, 1, 0, 99, 100, 0, "
+            "'per_gram', -1, 0, 100, 0, '', 'Main', '', 't', 'active', "
+            "now(), '2026-01-01')",
+            "ck_transactions_making",
         ),
     ]
 
@@ -590,10 +609,11 @@ def test_pg_constraints_reject_invalid_rows(pg_engine):
                 "INSERT INTO transactions (reference, kind, product_id, "
                 "quantity_grams, gross_weight_grams, net_weight_grams, "
                 "deduction_grams, purity, rate_per_gram, charges, "
+                "making_charge_type, making_charge_value, making_amount, "
                 "total_amount, amount_paid, party_name, location, notes, "
                 "created_by, status, created_at, transaction_date) "
                 "VALUES ('PG-OK', 'sale', :pid, 1, 1, 1, 0, 99, 100, 0, "
-                "100, 50, '', 'Main', '', 't', 'active', now(), "
+                "'', 0, 0, 100, 50, '', 'Main', '', 't', 'active', now(), "
                 "'2026-01-01')"
             ),
             {"pid": product_id},

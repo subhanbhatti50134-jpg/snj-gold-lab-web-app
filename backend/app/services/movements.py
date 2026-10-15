@@ -15,7 +15,7 @@ from app.schemas.movements import (
 )
 from app.services.audit import log_audit
 from app.services.inventory import get_stock_balance
-from app.services.pricing import calculate_total
+from app.services.pricing import calculate_total, money
 from app.services.settings import get_bool_setting
 
 
@@ -84,11 +84,21 @@ def create_sales_return(
         )
 
     try:
+        # Refund the making charge in proportion to the returned weight so
+        # a partial return gives back exactly its share of the ujra.
+        returned_ratio = (
+            payload.quantity_grams / Decimal(str(original.quantity_grams))
+        )
+        making = money(
+            Decimal(str(original.making_amount)) * returned_ratio
+        )
+
         return_value = calculate_total(
             net_weight_grams=payload.quantity_grams,
             rate_per_gram=Decimal(str(original.rate_per_gram)),
             charges=Decimal("0"),
             purity=Decimal(str(original.purity)),
+            making=making,
         )
 
         returned = Transaction(
@@ -104,6 +114,9 @@ def create_sales_return(
             rate_id=original.rate_id,
             rate_per_gram=original.rate_per_gram,
             charges=Decimal("0"),
+            making_charge_type=original.making_charge_type,
+            making_charge_value=original.making_charge_value,
+            making_amount=making,
             total_amount=return_value,
             amount_paid=Decimal("0"),
             party_name=original.party_name,

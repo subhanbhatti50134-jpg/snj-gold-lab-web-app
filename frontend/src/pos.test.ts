@@ -21,6 +21,8 @@ function line(overrides: Partial<CartLine> = {}): CartLine {
     purity: 100,
     quantity_grams: 10,
     rate_per_gram: 3000,
+    making_charge_type: "",
+    making_charge_value: 0,
     ...overrides
   };
 }
@@ -50,6 +52,54 @@ describe("lineTotal / cartTotal", () => {
     expect(
       cartTotal([line(), line({ key: "k2", quantity_grams: 5 })])
     ).toBe(45000);
+  });
+});
+
+describe("making charges (ujra)", () => {
+  it("adds per-gram ujra to the line total", () => {
+    expect(
+      lineTotal(
+        line({ making_charge_type: "per_gram", making_charge_value: 15 })
+      )
+    ).toBe(30150); // 30000 + 10g * 15
+  });
+
+  it("takes percent from the metal value", () => {
+    expect(
+      lineTotal(line({ making_charge_type: "percent", making_charge_value: 10 }))
+    ).toBe(33000); // 30000 + 10%
+  });
+
+  it("applies a fixed amount regardless of weight", () => {
+    expect(
+      lineTotal(line({ making_charge_type: "fixed", making_charge_value: 500 }))
+    ).toBe(30500);
+  });
+
+  it("includes ujra in the cart total", () => {
+    expect(
+      cartTotal([
+        line({ making_charge_type: "fixed", making_charge_value: 500 }),
+        line({ key: "k2" })
+      ])
+    ).toBe(60500);
+  });
+
+  it("requires a positive value when a type is picked", () => {
+    expect(
+      validateLine(
+        line({ making_charge_type: "per_gram", making_charge_value: 0 })
+      )
+    ).toContain("Making charge");
+  });
+
+  it("rejects a value without a type", () => {
+    expect(
+      validateLine(line({ making_charge_type: "", making_charge_value: 50 }))
+    ).toContain("type");
+    expect(
+      validateLine(line({ making_charge_type: "fixed", making_charge_value: 50 }))
+    ).toBeNull();
   });
 });
 

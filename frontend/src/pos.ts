@@ -3,6 +3,8 @@
 
 import type { MetalRate } from "./types";
 
+export type MakingChargeType = "" | "per_gram" | "percent" | "fixed";
+
 export interface CartLine {
   key: string;
   product_id: number;
@@ -12,6 +14,8 @@ export interface CartLine {
   purity: number;
   quantity_grams: number;
   rate_per_gram: number;
+  making_charge_type: MakingChargeType;
+  making_charge_value: number;
 }
 
 export function money2(value: number): number {
@@ -19,10 +23,25 @@ export function money2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function metalOf(line: CartLine): number {
+  return line.quantity_grams * line.rate_per_gram * (line.purity / 100);
+}
+
+// Ujra: per gram of net weight, percent of metal value, or flat amount.
+export function makingOf(line: CartLine): number {
+  const value = Number(line.making_charge_value || 0);
+  if (!line.making_charge_type) return 0;
+  if (line.making_charge_type === "per_gram") {
+    return money2(line.quantity_grams * value);
+  }
+  if (line.making_charge_type === "percent") {
+    return money2((metalOf(line) * value) / 100);
+  }
+  return money2(value);
+}
+
 export function lineTotal(line: CartLine): number {
-  return money2(
-    line.quantity_grams * line.rate_per_gram * (line.purity / 100)
-  );
+  return money2(metalOf(line) + makingOf(line));
 }
 
 export function cartTotal(lines: CartLine[]): number {
@@ -33,6 +52,12 @@ export function validateLine(line: CartLine): string | null {
   if (!(line.quantity_grams > 0)) return "Weight must be greater than zero";
   if (!(line.rate_per_gram > 0)) return "Rate must be greater than zero";
   if (line.purity <= 0 || line.purity > 100) return "Purity must be 1–100";
+  if (line.making_charge_type && !(line.making_charge_value > 0)) {
+    return "Making charge must be greater than zero";
+  }
+  if (!line.making_charge_type && Number(line.making_charge_value)) {
+    return "Pick a making charge type or clear the value";
+  }
   return null;
 }
 

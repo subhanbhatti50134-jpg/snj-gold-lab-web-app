@@ -46,6 +46,9 @@ export interface Transaction {
   quantity_grams: number | string;
   rate_per_gram: number | string;
   charges: number | string;
+  making_charge_type: string;
+  making_charge_value: number | string;
+  making_amount: number | string;
   total_amount: number | string;
   amount_paid: number | string;
   party_name: string;
