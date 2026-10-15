@@ -17,7 +17,6 @@ from app.api.export import router as export_router
 from app.api.inventory import router as inventory_router
 from app.api.monitoring import router as monitoring_router
 from app.api.movements import router as movements_router
-from app.api.orders import router as orders_router
 from app.api.parties import router as parties_router
 from app.api.payments import router as payments_router
 from app.api.products import router as products_router
@@ -125,7 +124,6 @@ app.include_router(payments_router)
 app.include_router(movements_router)
 app.include_router(reports_router)
 app.include_router(export_router)
-app.include_router(orders_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(parties_router)

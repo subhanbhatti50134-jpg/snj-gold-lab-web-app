@@ -271,9 +271,6 @@ tbody tr:hover { background: var(--hover); }
 .kind.sales_return { background: #fdeeea; color: #c05640; }
 .kind.stock_adjustment { background: #eef1f6; color: #5c6b81; }
 .kind.stock_transfer { background: #eaf1fd; color: #4a6fa5; }
-.kind.pending { background: #fdf3d7; color: #96741c; }
-.kind.delivered { background: #e7f5ef; color: #348a70; }
-.kind.cancelled { background: #f0f2f5; color: #5c6b81; }
 .kind.received { background: #e7f5ef; color: #348a70; }
 .kind.paid { background: #fdeeea; color: #c05640; }
 
@@ -439,9 +436,6 @@ tbody tr:hover { background: var(--hover); }
 :root[data-theme="dark"] .kind.sales_return { background: #33211a; color: #e09268; }
 :root[data-theme="dark"] .kind.stock_adjustment { background: #212b3a; color: #9fb0c6; }
 :root[data-theme="dark"] .kind.stock_transfer { background: #16263a; color: #82aede; }
-:root[data-theme="dark"] .kind.pending { background: #2e2612; color: #d9b45c; }
-:root[data-theme="dark"] .kind.delivered { background: #123026; color: #6cc5a2; }
-:root[data-theme="dark"] .kind.cancelled { background: #212b3a; color: #93a1b3; }
 :root[data-theme="dark"] .metal-tag { background: #241f33; color: #a98ed0; }
 :root[data-theme="dark"] .metal-tag.gold { background: #2e2616; color: #d8ac5e; }
 :root[data-theme="dark"] .metal-tag.silver { background: #232a34; color: #9fb0c6; }
