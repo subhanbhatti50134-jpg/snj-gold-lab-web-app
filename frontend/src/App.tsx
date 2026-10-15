@@ -102,6 +102,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [backupWarning, setBackupWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkTheme, setDarkTheme] = useState(
     () => document.documentElement.dataset.theme === "dark"
@@ -143,6 +144,33 @@ export default function App() {
       })
       .catch(() => {
         // Keep the default currency when settings are unreachable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, refreshKey]);
+
+  // Admin nag: remind when the newest backup is older than the threshold
+  // (or none was ever taken). Best-effort — never blocks the app.
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      setBackupWarning(null);
+      return;
+    }
+    let cancelled = false;
+    api<{ overdue: boolean; age_days: number | null }>(
+      "/api/backups/status"
+    )
+      .then(status => {
+        if (cancelled || !status.overdue) return;
+        setBackupWarning(
+          status.age_days === null
+            ? "Abhi tak koi backup nahi liya gaya"
+            : `Backup ${status.age_days} din purana hai`
+        );
+      })
+      .catch(() => {
+        // The banner is optional; a failed status check must not hurt UX.
       });
     return () => {
       cancelled = true;
@@ -371,6 +399,14 @@ export default function App() {
             <div className="alert success">
               <span>{notice}</span>
               <button onClick={() => setNotice("")}>✕</button>
+            </div>
+          )}
+          {backupWarning && (
+            <div className="alert warn">
+              <span>
+                ⚠ {backupWarning} — Settings &gt; Backup se abhi lein.
+              </span>
+              <button onClick={() => setBackupWarning(null)}>✕</button>
             </div>
           )}
 

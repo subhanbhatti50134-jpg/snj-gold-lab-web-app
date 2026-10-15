@@ -171,6 +171,7 @@ tbody tr:hover { background: var(--hover); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; }
 .alert.error { background: #fff0ee; border: 1px solid #f4d9d4; color: #a4493e; }
 .alert.success { background: #e9f7f0; border: 1px solid #d5eee1; color: #32846a; }
+.alert.warn { background: #fdf6e3; border: 1px solid #f0e3bc; color: #8a6d1a; }
 .loading { margin: -7px 0 15px; color: var(--text-3); font-size: 10px; }
 .footer { display: flex; justify-content: space-between; padding: 21px 2px 0; color: var(--text-3); font-size: 9px; }
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; overflow: auto; padding: 18px; background: #081524b8; }
@@ -428,6 +429,7 @@ tbody tr:hover { background: var(--hover); }
 :root[data-theme="dark"] .hint { background: #2a2415; color: #d9bd7a; }
 :root[data-theme="dark"] .alert.error { background: #2d1a17; border-color: #4a2a24; color: #ef9a8d; }
 :root[data-theme="dark"] .alert.success { background: #11291f; border-color: #1e4436; color: #74cfae; }
+:root[data-theme="dark"] .alert.warn { background: #2e2612; border-color: #4a3d1a; color: #d9b45c; }
 :root[data-theme="dark"] .status.active { background: #123026; color: #6cc5a2; }
 :root[data-theme="dark"] .status.inactive { background: #212b3a; color: #93a1b3; }
 :root[data-theme="dark"] .kind.purchase,

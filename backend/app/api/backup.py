@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, status
@@ -8,11 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import ADMIN_ROLES, require_roles
 from app.db.session import get_db
+from app.models.audit import AuditLog
 from app.models.user import User
 from app.services import backup as backup_service
 from app.services.audit import log_audit
 
 router = APIRouter(prefix="/api/backups", tags=["Database Backup"])
+
+# Warn on the dashboard once no backup has run for this many days.
+BACKUP_OVERDUE_DAYS = 7
 
 
 class RestoreRequest(BaseModel):
@@ -32,6 +36,13 @@ class JsonBackupOut(BackupOut):
     counts: dict[str, int] | None = None
 
 
+class BackupStatusOut(BaseModel):
+    last_backup_at: datetime | None
+    overdue: bool
+    age_days: int | None = None
+    threshold_days: int = BACKUP_OVERDUE_DAYS
+
+
 class RestoreOut(BaseModel):
     filename: str
     restored: bool
@@ -46,6 +57,41 @@ class RestoreOut(BaseModel):
 )
 def get_backups():
     return backup_service.list_backups()
+
+
+@router.get(
+    "/status",
+    response_model=BackupStatusOut,
+    dependencies=[Depends(require_roles(*ADMIN_ROLES))],
+)
+def backup_status(db: Session = Depends(get_db)):
+    """Age of the newest backup, so the UI can nag before data is lost."""
+    latest = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action.in_(("backup.create", "backup.create.json"))
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(1)
+        .first()
+    )
+
+    if latest is None:
+        return BackupStatusOut(
+            last_backup_at=None, overdue=True, age_days=None
+        )
+
+    created = latest.created_at
+    if created.tzinfo is None:
+        # SQLite returns naive timestamps; they were written in UTC.
+        created = created.replace(tzinfo=UTC)
+
+    age = datetime.now(UTC) - created
+    return BackupStatusOut(
+        last_backup_at=created,
+        overdue=age.days >= BACKUP_OVERDUE_DAYS,
+        age_days=age.days,
+    )
 
 
 @router.post(
