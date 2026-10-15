@@ -8,8 +8,10 @@ services:
       POSTGRES_DB: hisabpro
       POSTGRES_USER: hisabpro
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    # No host port on purpose: the database must never be reachable from
-    # outside the compose network. Backend talks to it as db:5432.
+    # Loopback-only host port so local dev (PG test suite, admin scripts)
+    # can reach the real database; 127.0.0.1 keeps it off the LAN/WAN.
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
       - hisabpro_data:/var/lib/postgresql/data
     healthcheck:
