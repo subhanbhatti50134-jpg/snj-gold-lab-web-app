@@ -1,5 +1,7 @@
 # SNJ Gold Lab
 
+![GitHub repository card for snj-gold-lab-web-app](docs/images/snj-gold-lab.png)
+
 Inventory and transaction management for gold, silver, jewellery, biscuit and
 laboratory materials. Built with **FastAPI + SQLAlchemy + PostgreSQL** on the
 backend and **React + TypeScript + Vite** on the frontend.
