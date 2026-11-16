@@ -5,8 +5,13 @@ transactions with payments. Safe to run once: it stops when products
 already exist.
 
     .venv/bin/python scripts/seed_demo.py
+
+Security: the demo user password must be provided through the
+SEED_DEMO_PASSWORD environment variable. The fallback below is a
+deliberate placeholder and MUST be replaced before any non-local use.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -30,7 +35,8 @@ from app.services.payments import record_payment
 from app.services.pricing import normalize_rate
 from app.services.transactions import create_transaction
 
-DEMO_PASSWORD = "DemoPass!1234"
+# Set via SEED_DEMO_PASSWORD in production; never commit a real password.
+DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "CHANGE_ME_DEMO_PASSWORD")
 SEED_USER = "seed"
 
 
