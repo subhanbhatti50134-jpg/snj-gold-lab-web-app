@@ -1,5 +1,7 @@
 # SNJ Gold Lab
 
+[![CI](https://github.com/subhanbhatti50134-jpg/snj-gold-lab-web-app/actions/workflows/ci.yml/badge.svg)](https://github.com/subhanbhatti50134-jpg/snj-gold-lab-web-app/actions/workflows/ci.yml)
+
 ![GitHub repository card for snj-gold-lab-web-app](docs/images/snj-gold-lab.png)
 
 Inventory and transaction management for gold, silver, jewellery, biscuit and
